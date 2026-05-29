@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v13';
+const APP_VERSION = 'v14';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -135,9 +135,15 @@ const SURF_LABEL = { asf: 'Asfalto', terra: 'Terra', grama: 'Grama', outro: 'Out
 function surfColor(s) { return SURF_COLOR[s] || '#9ca3af'; }
 // PORTE do aeródromo (tipo): controla o TAMANHO do símbolo (3=grande,2=médio,1=peq,0=hidro)
 // símbolo de pista (comprimento x espessura, em px) quando não há geometria real / zoom baixo
-const SYM_LEN = { 3: 24, 2: 16, 1: 10, 0: 14 };
-const SYM_H   = { 3: 7, 2: 5, 1: 4, 0: 5 };
-const RWY_W  = { 3: 9, 2: 5.5, 1: 3, 0: 5 };  // espessura da pista desenhada (zoom alto, geometria real)
+// SYM_SCALE = fator de tamanho dos ícones de pista (1.2 = 120%)
+const SYM_SCALE = 1.2;
+const _SL = { 3: 24, 2: 16, 1: 10, 0: 14 };
+const _SH = { 3: 7, 2: 5, 1: 4, 0: 5 };
+const _RW = { 3: 9, 2: 5.5, 1: 3, 0: 5 };     // espessura da pista geográfica (zoom alto)
+const SYM_LEN = {}, SYM_H = {}, RWY_W = {};
+for (const k in _SL) SYM_LEN[k] = Math.round(_SL[k] * SYM_SCALE);
+for (const k in _SH) SYM_H[k] = Math.round(_SH[k] * SYM_SCALE * 10) / 10;
+for (const k in _RW) RWY_W[k] = Math.round(_RW[k] * SYM_SCALE * 10) / 10;
 const RUNWAY_ZOOM = 12;                        // >= isto: pista geográfica real; abaixo: ícone inclinado
 const RWYID_ZOOM = 12;                          // >= isto: cabeceiras na pista geográfica
 const GLYPH_ID_ZOOM = 10;                       // >= isto: cabeceiras no ícone inclinado (zoom afastado)
