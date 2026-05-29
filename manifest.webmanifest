@@ -1,6 +1,6 @@
 {
-  "name": "AgroNav — Navegação Aérea",
-  "short_name": "AgroNav",
+  "name": "Nave Corvino — Navegação Aérea",
+  "short_name": "Nave Corvino",
   "description": "Navegação aérea para aviação agrícola: mapa GPS, rota, E6B, talhões e aeródromos.",
   "start_url": "./index.html",
   "scope": "./",

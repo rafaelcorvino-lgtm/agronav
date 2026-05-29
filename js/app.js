@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v14';
+const APP_VERSION = 'v15';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -906,7 +906,7 @@ function wire() {
   $('#btnExport').addEventListener('click', exportAll);
   $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importAll(e.target.files[0]); });
   $('#btnWipe').addEventListener('click', () => {
-    if (!confirm('Apagar TODOS os dados do AgroNav (rotas, talhões, config)?')) return;
+    if (!confirm('Apagar TODOS os dados do Nave Corvino (rotas, talhões, config)?')) return;
     ['cfg','route','savedRoutes','fields'].forEach(LS.del);
     location.reload();
   });
