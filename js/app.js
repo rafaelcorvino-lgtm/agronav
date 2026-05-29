@@ -191,11 +191,12 @@ function renderAirportMarkers() {
   for (const a of AIRPORT_MAP.values()) {
     if (a.lat < b.getSouth() || a.lat > b.getNorth() || a.lon < b.getWest() || a.lon > b.getEast()) continue;
     const rws = RUNWAYS.get(a.icao);
-    if (rws && rws.length && z >= RUNWAY_ZOOM) {
-      // zoom perto: pista geográfica REAL (orientação e comprimento exatos) + cabeceiras
+    const hasGeo = rws && rws.some(r => r[8] === 1);   // geometria geográfica real
+    if (rws && rws.length && z >= RUNWAY_ZOOM && hasGeo) {
+      // zoom perto + geometria REAL: pista geográfica (orientação e comprimento exatos) + cabeceiras
       const w = RWY_W[a.t] || 4;
       const showIds = z >= RWYID_ZOOM;
-      rws.forEach(rw => {
+      rws.filter(r => r[8] === 1).forEach(rw => {
         const pts = [[rw[0], rw[1]], [rw[2], rw[3]]];
         const casing = L.polyline(pts, { color: '#0b1219', weight: w + 3, opacity: .85, lineCap: 'butt' });
         const top = L.polyline(pts, { color: surfColor(rw[4]), weight: w, opacity: 1, lineCap: 'butt' });
@@ -210,7 +211,7 @@ function renderAirportMarkers() {
         }
       });
     } else {
-      // zoom afastado, ou sem geometria: ícone de pista inclinada (se houver rumo) ou tracinho
+      // ícone de pista inclinada (orientação real ou deduzida do número) + cabeceiras; senão tracinho
       const icon = (rws && rws.length) ? runwayIcon(a, rws, z >= GLYPH_ID_ZOOM) : aptSymbol(a);
       const m = L.marker([a.lat, a.lon], { icon });
       m.bindTooltip(a.icao, { direction: 'top', offset: [0, -6] });
