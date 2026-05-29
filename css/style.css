@@ -58,7 +58,7 @@ body {
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
 
 /* ===== MAIN ===== */
-.main { flex:1; margin-left:var(--sidebar-width); min-height:100vh; position:relative; }
+.main { flex:1; min-width:0; margin-left:var(--sidebar-width); min-height:100vh; position:relative; }
 .page { display:none; }
 .page.active { display:block; }
 .page-header { padding:18px 24px; border-bottom:1px solid var(--border-color); background:var(--bg-secondary); position:sticky; top:0; z-index:10; }
@@ -204,4 +204,7 @@ body {
     .grid-2, .grid-3 { grid-template-columns:1fr; }
     .content { padding:16px; }
     .page-header { padding-left:64px; }
+    .data-table th, .data-table td { padding:8px 6px; font-size:12px; }
+    .data-table th { font-size:10px; letter-spacing:0; }
+    .table-wrap { -webkit-overflow-scrolling:touch; }
 }
