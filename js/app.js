@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -32,7 +32,8 @@ const state = {
   activeNavIdx: 0,
   showAirports: true,
   gotoTarget: null,
-  legendHidden: LS.get('legendHidden', false)
+  legendHidden: LS.get('legendHidden', false),
+  showAirspace: LS.get('showAirspace', false)
 };
 
 /* ---------- Geo math ---------- */
@@ -100,6 +101,7 @@ $('#sidebarOverlay').addEventListener('click', closeSidebar);
    MAP
    =================================================================== */
 let map, posMarker, posAccCircle, trackLine, routeLine, drawLine, gotoLine, airportGroup;
+let airspaceLayer = null, aspRenderer = null;
 const wpMarkers = [];
 const fieldLayers = [];
 const AIRPORT_MIN_ZOOM = 8;   // abaixo disso são muitos aeródromos — não plota
@@ -243,6 +245,57 @@ function renderAirportMarkers() {
     }
     if (++n >= AIRPORT_MAX_MARKERS) break;
   }
+}
+
+/* ===================================================================
+   ESPAÇO AÉREO (DECEA) — overlay de referência
+   =================================================================== */
+const ASP_STYLE = {
+  CTR:   { color: '#3b82f6', fill: .10, w: 1.6 },
+  TMA:   { color: '#8b5cf6', fill: .07, w: 1.4 },
+  CTA:   { color: '#0ea5e9', fill: .05, w: 1.2 },
+  CTA_P: { color: '#0ea5e9', fill: .05, w: 1.2 },
+  P:     { color: '#dc2626', fill: .20, w: 1.8 },
+  R:     { color: '#ef4444', fill: .12, w: 1.6 },
+  D:     { color: '#f59e0b', fill: .12, w: 1.6 }
+};
+const ASP_LABEL = {
+  CTR: 'Zona de Controle (CTR)', TMA: 'Terminal (TMA)', CTA: 'Área de Controle (CTA)',
+  CTA_P: 'Área de Controle', P: 'Área PROIBIDA (P)', R: 'Área RESTRITA (R)', D: 'Área PERIGOSA (D)'
+};
+function aspStyle(f) {
+  const s = ASP_STYLE[f.properties.t] || { color: '#94a3b8', fill: .06, w: 1.2 };
+  return { color: s.color, weight: s.w, fillColor: s.color, fillOpacity: s.fill, opacity: .9 };
+}
+function aspPopup(f) {
+  const p = f.properties;
+  const lbl = ASP_LABEL[p.t] || p.t;
+  let h = `<b>${p.id || ''}</b> ${p.nm ? '— ' + p.nm : ''}<br><span class="apt-meta">${lbl}</span>`;
+  if (p.lo || p.up) h += `<br>Vert: <b>${p.lo || '?'} → ${p.up || '?'}</b>`;
+  return h;
+}
+function loadAirspace() {
+  fetch('data/br-airspace.json', { cache: 'force-cache' })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(geo => {
+      aspRenderer = L.canvas({ padding: 0.5 });
+      airspaceLayer = L.geoJSON(geo, {
+        renderer: aspRenderer,
+        style: aspStyle,
+        onEachFeature: (f, layer) => layer.bindPopup(() => aspPopup(f), { minWidth: 200 })
+      });
+      if (state.showAirspace) airspaceLayer.addTo(map);
+      const btn = $('#btnAirspace'); if (btn) btn.classList.toggle('active', state.showAirspace);
+    })
+    .catch(() => {});
+}
+function toggleAirspace() {
+  state.showAirspace = !state.showAirspace;
+  LS.set('showAirspace', state.showAirspace);
+  const btn = $('#btnAirspace'); if (btn) btn.classList.toggle('active', state.showAirspace);
+  if (!airspaceLayer) { toast('Carregando espaços aéreos…'); return; }
+  if (state.showAirspace) { airspaceLayer.addTo(map); toast('Espaço aéreo: ligado (referência — confira AIP/NOTAM)'); }
+  else { map.removeLayer(airspaceLayer); toast('Espaço aéreo: desligado'); }
 }
 
 function airportPopup(a) {
@@ -949,6 +1002,14 @@ function addDrawButton() {
     toast(state.showAirports ? 'Aeródromos no mapa: ligado (dê zoom p/ ver)' : 'Aeródromos no mapa: desligado');
   });
   $('.map-controls').appendChild(aptBtn);
+
+  // botão liga/desliga espaços aéreos (CTR/TMA/CTA/P/R/D)
+  const aspBtn = document.createElement('button');
+  aspBtn.className = 'map-btn' + (state.showAirspace ? ' active' : '');
+  aspBtn.id = 'btnAirspace'; aspBtn.title = 'Espaços aéreos (CTR/TMA/áreas P/R/D)';
+  aspBtn.innerHTML = '<i class="fas fa-shield-halved"></i>';
+  aspBtn.addEventListener('click', toggleAirspace);
+  $('.map-controls').appendChild(aspBtn);
 }
 
 /* ===================================================================
@@ -963,6 +1024,7 @@ function init() {
   renderRoute();
   renderFields();
   loadAirportsOnline();
+  loadAirspace();
   // run E6B defaults
   calcWindTriangle(); calcRunwayWind(); calcTSD(); calcDensityAlt(); calcConvert();
 }
