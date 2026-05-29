@@ -84,8 +84,7 @@ body {
 .apt-legend .leg-bar { width:18px; height:5px; border-radius:2px; border:1px solid rgba(0,0,0,.5); flex:none; box-sizing:border-box; }
 .apt-legend .leg-sep { margin-top:7px; }
 .apt-legend .leg-row { min-height:17px; }
-.apt-legend .leg-size { border-radius:50%; background:var(--text-secondary); border:1.5px solid #0b1219; flex:none; box-sizing:border-box; }
-.apt-legend .leg-bar, .apt-legend .leg-size { margin-right:2px; }
+.apt-legend .leg-strip { height:5px; border-radius:2px; background:var(--text-secondary); border:1px solid #0b1219; flex:none; box-sizing:border-box; }
 
 .map-controls { position:fixed; top:14px; right:14px; z-index:500; display:flex; flex-direction:column; gap:8px; }
 .map-btn { width:44px; height:44px; border-radius:var(--radius); border:1px solid var(--border-color); background:rgba(15,25,35,.88); color:var(--text-primary); font-size:17px; cursor:pointer; box-shadow:var(--shadow); transition:all .15s; }
@@ -214,6 +213,7 @@ body {
 .wp-label { background:rgba(15,25,35,.85); border:1px solid var(--accent-cyan); color:var(--accent-cyan); border-radius:5px; padding:1px 6px; font-size:11px; font-weight:700; white-space:nowrap; }
 .plane-icon { font-size:26px; color:var(--accent-cyan); text-shadow:0 0 6px rgba(0,0,0,.8); }
 .rwy-id { display:inline-block; transform:translate(-50%,-50%); background:rgba(11,18,25,.9); color:#fff; font-size:10px; font-weight:700; padding:1px 4px; border-radius:3px; white-space:nowrap; border:1px solid rgba(255,255,255,.25); }
+.apt-strip { display:block; border-radius:2px; border:1px solid #0b1219; box-shadow:0 0 2px rgba(0,0,0,.6); }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width:860px) {

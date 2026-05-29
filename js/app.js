@@ -132,8 +132,10 @@ const SURF_COLOR = { asf: '#64748b', terra: '#b45309', grama: '#22c55e', outro: 
 const SURF_LABEL = { asf: 'Asfalto', terra: 'Terra', grama: 'Grama', outro: 'Outro' };
 function surfColor(s) { return SURF_COLOR[s] || '#9ca3af'; }
 // PORTE do aeródromo (tipo): controla o TAMANHO do símbolo (3=grande,2=médio,1=peq,0=hidro)
-const TYPE_R = { 3: 12, 2: 7, 1: 4, 0: 6 };   // raio do ponto (zoom baixo) — diferença bem marcante
-const RWY_W  = { 3: 9, 2: 5.5, 1: 3, 0: 5 };  // espessura da pista desenhada (zoom alto)
+// símbolo de pista (comprimento x espessura, em px) quando não há geometria real / zoom baixo
+const SYM_LEN = { 3: 24, 2: 16, 1: 10, 0: 14 };
+const SYM_H   = { 3: 7, 2: 5, 1: 4, 0: 5 };
+const RWY_W  = { 3: 9, 2: 5.5, 1: 3, 0: 5 };  // espessura da pista desenhada (zoom alto, geometria real)
 const RUNWAY_ZOOM = 12;                        // a partir daqui desenha a pista de verdade
 const RWYID_ZOOM = 13;                         // a partir daqui mostra os números de cabeceira
 let RUNWAYS = new Map();                        // ICAO -> [[le_lat,le_lon,he_lat,he_lon,surf,len_ft], ...]
@@ -142,6 +144,16 @@ function rwyLabel(ll, txt) {
   return L.marker(ll, {
     icon: L.divIcon({ className: '', html: `<span class="rwy-id">${txt}</span>`, iconSize: [0, 0] }),
     interactive: false, keyboard: false
+  });
+}
+
+// símbolo de pista (comprimento = porte, cor = piso) — usado sem geometria real / zoom baixo
+function aptSymbol(a) {
+  const len = SYM_LEN[a.t] || 10, h = SYM_H[a.t] || 4;
+  return L.divIcon({
+    className: '',
+    html: `<span class="apt-strip" style="width:${len}px;height:${h}px;background:${surfColor(a.s)}"></span>`,
+    iconSize: [len, h], iconAnchor: [len / 2, h / 2]
   });
 }
 
@@ -176,10 +188,8 @@ function renderAirportMarkers() {
         }
       });
     } else {
-      const m = L.circleMarker([a.lat, a.lon], {
-        radius: (TYPE_R[a.t] || 4), color: '#0b1219', weight: 1.5, fillColor: surfColor(a.s), fillOpacity: .95
-      });
-      m.bindTooltip(a.icao, { direction: 'top', offset: [0, -4] });
+      const m = L.marker([a.lat, a.lon], { icon: aptSymbol(a) });
+      m.bindTooltip(a.icao, { direction: 'top', offset: [0, -6] });
       m.bindPopup(() => airportPopup(a), { minWidth: 200 });
       airportGroup.addLayer(m);
     }
