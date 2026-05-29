@@ -127,17 +127,29 @@ function initMap() {
 }
 
 /* ---------- Aeródromos no mapa ---------- */
+// cores por tipo: 3=grande, 2=médio, 1=pequeno/fazenda, 0=hidroavião
+const APT_STYLE = {
+  3: { color: '#3b82f6', r: 7 },
+  2: { color: '#22c55e', r: 6 },
+  1: { color: '#f59e0b', r: 4 },
+  0: { color: '#a855f7', r: 5 }
+};
+function aptStyle(t) { return APT_STYLE[t] || { color: '#8a9bb0', r: 4 }; }
+
 function renderAirportMarkers() {
   if (!airportGroup) return;
   airportGroup.clearLayers();
-  if (!state.showAirports) return;
-  if (map.getZoom() < AIRPORT_MIN_ZOOM) return;     // muitos aeródromos em zoom baixo
+  const legend = document.getElementById('aptLegend');
+  if (!state.showAirports) { if (legend) legend.classList.add('hidden'); return; }
+  if (map.getZoom() < AIRPORT_MIN_ZOOM) { if (legend) legend.classList.add('hidden'); return; }
+  if (legend) legend.classList.remove('hidden');
   const b = map.getBounds();
   let n = 0;
   for (const a of AIRPORT_MAP.values()) {
     if (a.lat < b.getSouth() || a.lat > b.getNorth() || a.lon < b.getWest() || a.lon > b.getEast()) continue;
+    const st = aptStyle(a.t);
     const m = L.circleMarker([a.lat, a.lon], {
-      radius: 5, color: '#f59e0b', weight: 2, fillColor: '#1e2d3d', fillOpacity: 1
+      radius: st.r, color: '#0b1219', weight: 1.5, fillColor: st.color, fillOpacity: .95
     });
     m.bindTooltip(a.icao, { direction: 'top', offset: [0, -4] });
     m.bindPopup(() => airportPopup(a), { minWidth: 200 });
@@ -505,8 +517,8 @@ function buildAirportIndex(brData) {
   AIRPORT_MAP.clear();
   // 1) base ampla (BR inteira)
   (brData || []).forEach(r => {
-    const [icao, name, city, uf, lat, lon, elev] = r;
-    AIRPORT_MAP.set(icao, { icao, name, city, uf, lat, lon, elev });
+    const [icao, name, city, uf, lat, lon, elev, t] = r;
+    AIRPORT_MAP.set(icao, { icao, name, city, uf, lat, lon, elev, t });
   });
   // 2) base local rica: adiciona/sobrepõe pista + frequência
   AERODROMES.forEach(a => {
