@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f1923">
+    <title>AgroNav — Navegação Aérea</title>
+    <!-- PWA / instalar na tela inicial -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AgroNav">
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-location-arrow"></i>
+            <h2>AgroNav</h2>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item active" data-page="map"><i class="fas fa-map-location-dot"></i><span>Mapa / GPS</span></li>
+            <li class="nav-item" data-page="route"><i class="fas fa-route"></i><span>Rota</span></li>
+            <li class="nav-item" data-page="e6b"><i class="fas fa-calculator"></i><span>E6B</span></li>
+            <li class="nav-item" data-page="fields"><i class="fas fa-seedling"></i><span>Talhões</span></li>
+            <li class="nav-item" data-page="aero"><i class="fas fa-tower-control"></i><span>Aeródromos</span></li>
+            <li class="nav-item" data-page="settings"><i class="fas fa-gear"></i><span>Configurações</span></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span id="gps-status-badge" class="gps-badge gps-off"><i class="fas fa-circle"></i> GPS off</span>
+        </div>
+    </aside>
+
+    <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main">
+
+        <!-- ===== PAGE: MAP / GPS ===== -->
+        <section class="page active" id="page-map">
+            <div id="map"></div>
+
+            <!-- HUD: live flight data -->
+            <div class="hud" id="hud">
+                <div class="hud-item"><span class="hud-label">GS</span><span class="hud-val" id="hud-gs">--</span><span class="hud-unit">kt</span></div>
+                <div class="hud-item"><span class="hud-label">TRK</span><span class="hud-val" id="hud-trk">--</span><span class="hud-unit">°</span></div>
+                <div class="hud-item"><span class="hud-label">ALT</span><span class="hud-val" id="hud-alt">--</span><span class="hud-unit">ft</span></div>
+                <div class="hud-item"><span class="hud-label">LAT</span><span class="hud-val sm" id="hud-lat">--</span></div>
+                <div class="hud-item"><span class="hud-label">LON</span><span class="hud-val sm" id="hud-lon">--</span></div>
+            </div>
+
+            <!-- Map control buttons -->
+            <div class="map-controls">
+                <button class="map-btn" id="btnLocate" title="Iniciar/parar GPS"><i class="fas fa-location-crosshairs"></i></button>
+                <button class="map-btn" id="btnFollow" title="Seguir posição"><i class="fas fa-crosshairs"></i></button>
+                <button class="map-btn" id="btnLayer" title="Trocar camada"><i class="fas fa-layer-group"></i></button>
+                <button class="map-btn" id="btnTrack" title="Gravar trilha"><i class="fas fa-route"></i></button>
+                <button class="map-btn" id="btnAddWp" title="Adicionar waypoint no clique"><i class="fas fa-map-pin"></i></button>
+            </div>
+
+            <!-- Active leg / nav banner -->
+            <div class="nav-banner hidden" id="navBanner">
+                <div class="nav-banner-to">
+                    <i class="fas fa-location-dot"></i>
+                    <span id="nav-to-name">—</span>
+                </div>
+                <div class="nav-banner-data">
+                    <div><span class="nb-label">DIST</span><span id="nav-dist">--</span> NM</div>
+                    <div><span class="nb-label">RUMO</span><span id="nav-brg">--</span>°</div>
+                    <div><span class="nb-label">ETE</span><span id="nav-ete">--</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PAGE: ROUTE ===== -->
+        <section class="page" id="page-route">
+            <div class="page-header"><h1><i class="fas fa-route"></i> Planejamento de Rota</h1></div>
+            <div class="content">
+                <div class="card">
+                    <div class="card-head"><h3>Adicionar ponto</h3></div>
+                    <div class="grid-2">
+                        <div class="field"><label>Nome / ICAO</label><input type="text" id="wpName" placeholder="Ex: SBSP ou Talhão 4"></div>
+                        <div class="field"><label>Latitude (decimal)</label><input type="number" step="any" id="wpLat" placeholder="-23.6266"></div>
+                        <div class="field"><label>Longitude (decimal)</label><input type="number" step="any" id="wpLon" placeholder="-46.6556"></div>
+                        <div class="field end"><button class="btn btn-primary" id="btnAddRoutePt"><i class="fas fa-plus"></i> Adicionar à rota</button></div>
+                    </div>
+                    <p class="hint">Dica: você também pode tocar no mapa (botão <i class="fas fa-map-pin"></i>) ou adicionar a partir de um aeródromo.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h3>Rota atual</h3>
+                        <div class="card-actions">
+                            <button class="btn btn-ghost" id="btnReverseRoute"><i class="fas fa-arrows-left-right"></i> Inverter</button>
+                            <button class="btn btn-ghost danger" id="btnClearRoute"><i class="fas fa-trash"></i> Limpar</button>
+                        </div>
+                    </div>
+                    <div class="route-params grid-3">
+                        <div class="field"><label>Vel. solo (kt)</label><input type="number" id="routeGS" value="110"></div>
+                        <div class="field"><label>Consumo (L/h)</label><input type="number" id="routeFF" value="120"></div>
+                        <div class="field"><label>Decl. mag. (°)</label><input type="number" id="routeVar" value="-21" title="Negativo = Oeste (W). Brasil ~ -19 a -23°"></div>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="data-table" id="routeTable">
+                            <thead><tr><th>#</th><th>Ponto</th><th>Rumo M</th><th>Dist (NM)</th><th>ETE</th><th>Comb (L)</th><th></th></tr></thead>
+                            <tbody></tbody>
+                            <tfoot><tr><td colspan="3">TOTAL</td><td id="rt-total-dist">0</td><td id="rt-total-ete">0</td><td id="rt-total-fuel">0</td><td></td></tr></tfoot>
+                        </table>
+                    </div>
+                    <div class="route-saved-actions">
+                        <input type="text" id="routeSaveName" placeholder="Nome do plano de voo">
+                        <button class="btn btn-primary" id="btnSaveRoute"><i class="fas fa-floppy-disk"></i> Salvar plano</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head"><h3>Planos salvos</h3></div>
+                    <div id="savedRoutesList" class="saved-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PAGE: E6B ===== -->
+        <section class="page" id="page-e6b">
+            <div class="page-header"><h1><i class="fas fa-calculator"></i> Computador de Voo E6B</h1></div>
+            <div class="content">
+                <div class="grid-cards">
+                    <!-- Wind triangle -->
+                    <div class="card">
+                        <div class="card-head"><h3><i class="fas fa-wind"></i> Triângulo do vento</h3></div>
+                        <div class="grid-2">
+                            <div class="field"><label>Curso verdadeiro TC (°)</label><input type="number" id="e6b-tc" value="90"></div>
+                            <div class="field"><label>Vel. aerodin. TAS (kt)</label><input type="number" id="e6b-tas" value="110"></div>
+                            <div class="field"><label>Vento DE (°)</label><input type="number" id="e6b-wdir" value="180"></div>
+                            <div class="field"><label>Vel. vento (kt)</label><input type="number" id="e6b-wspd" value="20"></div>
+                        </div>
+                        <div class="result-grid">
+                            <div class="result"><span class="r-label">Correção (WCA)</span><span class="r-val" id="e6b-wca">--</span></div>
+                            <div class="result"><span class="r-label">Proa (TH)</span><span class="r-val" id="e6b-th">--</span></div>
+                            <div class="result"><span class="r-label">Vel. solo (GS)</span><span class="r-val" id="e6b-gs">--</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Runway wind components -->
+                    <div class="card">
+                        <div class="card-head"><h3><i class="fas fa-plane-departure"></i> Vento na pista</h3></div>
+                        <div class="grid-2">
+                            <div class="field"><label>Cabeceira (°)</label><input type="number" id="rw-hdg" value="170"></div>
+                            <div class="field"><label>Vento DE (°)</label><input type="number" id="rw-wdir" value="200"></div>
+                            <div class="field"><label>Vel. vento (kt)</label><input type="number" id="rw-wspd" value="15"></div>
+                        </div>
+                        <div class="result-grid">
+                            <div class="result"><span class="r-label">Proa / Cauda</span><span class="r-val" id="rw-head">--</span></div>
+                            <div class="result"><span class="r-label">Cruzado</span><span class="r-val" id="rw-cross">--</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Time / Speed / Distance / Fuel -->
+                    <div class="card">
+                        <div class="card-head"><h3><i class="fas fa-clock"></i> Tempo · Dist · Comb</h3></div>
+                        <div class="grid-2">
+                            <div class="field"><label>Distância (NM)</label><input type="number" id="tsd-dist" value="100"></div>
+                            <div class="field"><label>Vel. solo (kt)</label><input type="number" id="tsd-gs" value="110"></div>
+                            <div class="field"><label>Consumo (L/h)</label><input type="number" id="tsd-ff" value="120"></div>
+                        </div>
+                        <div class="result-grid">
+                            <div class="result"><span class="r-label">Tempo de voo</span><span class="r-val" id="tsd-time">--</span></div>
+                            <div class="result"><span class="r-label">Combustível</span><span class="r-val" id="tsd-fuel">--</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Density altitude -->
+                    <div class="card">
+                        <div class="card-head"><h3><i class="fas fa-temperature-half"></i> Altitude-densidade</h3></div>
+                        <div class="grid-2">
+                            <div class="field"><label>Alt. pressão (ft)</label><input type="number" id="da-palt" value="1500"></div>
+                            <div class="field"><label>Temp OAT (°C)</label><input type="number" id="da-oat" value="32"></div>
+                        </div>
+                        <div class="result-grid">
+                            <div class="result"><span class="r-label">Alt-densidade</span><span class="r-val" id="da-out">--</span></div>
+                            <div class="result"><span class="r-label">ISA</span><span class="r-val" id="da-isa">--</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Converter -->
+                    <div class="card">
+                        <div class="card-head"><h3><i class="fas fa-right-left"></i> Conversões</h3></div>
+                        <div class="conv-row">
+                            <input type="number" id="cv-input" value="100">
+                            <select id="cv-type">
+                                <optgroup label="Velocidade"><option value="kt_kmh">kt → km/h</option><option value="kmh_kt">km/h → kt</option><option value="kt_mph">kt → mph</option></optgroup>
+                                <optgroup label="Distância"><option value="nm_km">NM → km</option><option value="km_nm">km → NM</option><option value="nm_sm">NM → sm (mi)</option></optgroup>
+                                <optgroup label="Altitude"><option value="ft_m">ft → m</option><option value="m_ft">m → ft</option></optgroup>
+                                <optgroup label="Volume"><option value="l_gal">L → gal (US)</option><option value="gal_l">gal (US) → L</option></optgroup>
+                                <optgroup label="Pressão"><option value="inhg_hpa">inHg → hPa</option><option value="hpa_inhg">hPa → inHg</option></optgroup>
+                                <optgroup label="Temperatura"><option value="c_f">°C → °F</option><option value="f_c">°F → °C</option></optgroup>
+                            </select>
+                            <span class="conv-eq">=</span>
+                            <span class="conv-out" id="cv-out">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PAGE: FIELDS / TALHÕES ===== -->
+        <section class="page" id="page-fields">
+            <div class="page-header"><h1><i class="fas fa-seedling"></i> Talhões Agrícolas</h1></div>
+            <div class="content">
+                <div class="card info-card">
+                    <p><i class="fas fa-circle-info"></i> Vá ao <strong>Mapa</strong>, ative o modo desenho <i class="fas fa-draw-polygon"></i> e toque nos vértices do talhão. A área é calculada em hectares automaticamente.</p>
+                    <button class="btn btn-primary" id="btnGoDrawField"><i class="fas fa-draw-polygon"></i> Desenhar no mapa</button>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3>Talhões salvos</h3></div>
+                    <div id="fieldsList" class="saved-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PAGE: AERODROMES ===== -->
+        <section class="page" id="page-aero">
+            <div class="page-header"><h1><i class="fas fa-tower-control"></i> Aeródromos</h1></div>
+            <div class="content">
+                <div class="card">
+                    <div class="search-bar">
+                        <i class="fas fa-magnifying-glass"></i>
+                        <input type="text" id="aeroSearch" placeholder="Buscar por ICAO, cidade ou nome...">
+                    </div>
+                    <p class="hint" id="aeroCount"></p>
+                    <div class="table-wrap">
+                        <table class="data-table" id="aeroTable">
+                            <thead><tr><th>ICAO</th><th>Nome</th><th>Cidade/UF</th><th>Pista</th><th></th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PAGE: SETTINGS ===== -->
+        <section class="page" id="page-settings">
+            <div class="page-header"><h1><i class="fas fa-gear"></i> Configurações</h1></div>
+            <div class="content">
+                <div class="card">
+                    <div class="card-head"><h3>Aeronave / Padrões</h3></div>
+                    <div class="grid-2">
+                        <div class="field"><label>Matrícula</label><input type="text" id="cfg-tail" placeholder="PT-XXX"></div>
+                        <div class="field"><label>Modelo</label><input type="text" id="cfg-model" placeholder="Ipanema EMB-202"></div>
+                        <div class="field"><label>TAS cruzeiro (kt)</label><input type="number" id="cfg-tas" value="110"></div>
+                        <div class="field"><label>Consumo (L/h)</label><input type="number" id="cfg-ff" value="120"></div>
+                        <div class="field"><label>Decl. magnética (°)</label><input type="number" id="cfg-var" value="-21"></div>
+                        <div class="field"><label>Unidade de área</label>
+                            <select id="cfg-area"><option value="ha">Hectares (ha)</option><option value="ac">Acres</option><option value="km2">km²</option></select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="btnSaveCfg"><i class="fas fa-floppy-disk"></i> Salvar</button>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3>Dados</h3></div>
+                    <div class="card-actions wrap">
+                        <button class="btn btn-ghost" id="btnExport"><i class="fas fa-download"></i> Exportar tudo (JSON)</button>
+                        <label class="btn btn-ghost" for="importFile"><i class="fas fa-upload"></i> Importar JSON</label>
+                        <input type="file" id="importFile" accept="application/json" hidden>
+                        <button class="btn btn-ghost danger" id="btnWipe"><i class="fas fa-trash-can"></i> Apagar tudo</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3>Sobre</h3></div>
+                    <p class="about">AgroNav — assistente de navegação para aviação agrícola. Dados ficam no seu dispositivo (localStorage). <strong>Use apenas como apoio</strong>; não substitui cartas oficiais, GPS certificado nem planejamento formal. Aeródromos para referência — confira NOTAM/AIP antes do voo.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Field save modal -->
+    <div class="modal-overlay hidden" id="fieldModal">
+        <div class="modal">
+            <h3><i class="fas fa-seedling"></i> Salvar talhão</h3>
+            <div class="field"><label>Nome</label><input type="text" id="fieldNameInput" placeholder="Talhão 1 - Soja"></div>
+            <p class="modal-info">Área: <strong id="fieldAreaPreview">0 ha</strong></p>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="fieldCancel">Cancelar</button>
+                <button class="btn btn-primary" id="fieldSave">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="data/aerodromes.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+      }
+    </script>
+</body>
+</html>
