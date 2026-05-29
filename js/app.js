@@ -132,10 +132,18 @@ const SURF_COLOR = { asf: '#64748b', terra: '#b45309', grama: '#22c55e', outro: 
 const SURF_LABEL = { asf: 'Asfalto', terra: 'Terra', grama: 'Grama', outro: 'Outro' };
 function surfColor(s) { return SURF_COLOR[s] || '#9ca3af'; }
 // PORTE do aeródromo (tipo): controla o TAMANHO do símbolo (3=grande,2=médio,1=peq,0=hidro)
-const TYPE_R = { 3: 9, 2: 6, 1: 4, 0: 5 };    // raio do ponto (zoom baixo)
-const RWY_W  = { 3: 7, 2: 5, 1: 3.5, 0: 4 };  // espessura da pista desenhada (zoom alto)
+const TYPE_R = { 3: 12, 2: 7, 1: 4, 0: 6 };   // raio do ponto (zoom baixo) — diferença bem marcante
+const RWY_W  = { 3: 9, 2: 5.5, 1: 3, 0: 5 };  // espessura da pista desenhada (zoom alto)
 const RUNWAY_ZOOM = 12;                        // a partir daqui desenha a pista de verdade
+const RWYID_ZOOM = 13;                         // a partir daqui mostra os números de cabeceira
 let RUNWAYS = new Map();                        // ICAO -> [[le_lat,le_lon,he_lat,he_lon,surf,len_ft], ...]
+
+function rwyLabel(ll, txt) {
+  return L.marker(ll, {
+    icon: L.divIcon({ className: '', html: `<span class="rwy-id">${txt}</span>`, iconSize: [0, 0] }),
+    interactive: false, keyboard: false
+  });
+}
 
 function renderAirportMarkers() {
   if (!airportGroup) return;
@@ -152,6 +160,7 @@ function renderAirportMarkers() {
     if (rws && rws.length) {
       // desenha cada pista como linha orientada, colorida pelo piso (com contorno p/ destaque)
       const w = RWY_W[a.t] || 4;   // espessura = porte
+      const showIds = map.getZoom() >= RWYID_ZOOM;
       rws.forEach(rw => {
         const pts = [[rw[0], rw[1]], [rw[2], rw[3]]];
         const casing = L.polyline(pts, { color: '#0b1219', weight: w + 3, opacity: .85, lineCap: 'butt' });
@@ -161,6 +170,10 @@ function renderAirportMarkers() {
           l.bindPopup(() => airportPopup(a), { minWidth: 200 });
           airportGroup.addLayer(l);
         });
+        if (showIds) {   // números de cabeceira nas pontas
+          if (rw[6]) airportGroup.addLayer(rwyLabel([rw[0], rw[1]], rw[6]));
+          if (rw[7]) airportGroup.addLayer(rwyLabel([rw[2], rw[3]], rw[7]));
+        }
       });
     } else {
       const m = L.circleMarker([a.lat, a.lon], {
