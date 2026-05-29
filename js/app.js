@@ -136,8 +136,9 @@ function surfColor(s) { return SURF_COLOR[s] || '#9ca3af'; }
 const SYM_LEN = { 3: 24, 2: 16, 1: 10, 0: 14 };
 const SYM_H   = { 3: 7, 2: 5, 1: 4, 0: 5 };
 const RWY_W  = { 3: 9, 2: 5.5, 1: 3, 0: 5 };  // espessura da pista desenhada (zoom alto, geometria real)
-const RUNWAY_ZOOM = 12;                        // a partir daqui desenha a pista de verdade
-const RWYID_ZOOM = 13;                         // a partir daqui mostra os números de cabeceira
+const RUNWAY_ZOOM = 12;                        // >= isto: pista geográfica real; abaixo: ícone inclinado
+const RWYID_ZOOM = 12;                          // >= isto: cabeceiras na pista geográfica
+const GLYPH_ID_ZOOM = 10;                       // >= isto: cabeceiras no ícone inclinado (zoom afastado)
 let RUNWAYS = new Map();                        // ICAO -> [[le_lat,le_lon,he_lat,he_lon,surf,len_ft], ...]
 
 function rwyLabel(ll, txt) {
@@ -147,7 +148,28 @@ function rwyLabel(ll, txt) {
   });
 }
 
-// símbolo de pista (comprimento = porte, cor = piso) — usado sem geometria real / zoom baixo
+// pista mais longa de um aeródromo (para o glifo)
+function primaryRunway(rws) { return rws.reduce((m, x) => ((x[5] || 0) > (m[5] || 0) ? x : m), rws[0]); }
+
+// ÍCONE de pista inclinada no rumo REAL (Norte p/ cima), comprimento = porte, cor = piso, c/ cabeceiras.
+// Usado quando a geometria geográfica fica pequena demais (zoom afastado).
+function runwayIcon(a, rws, showIds) {
+  const rw = primaryRunway(rws);
+  const hdg = bearingTrue({ lat: rw[0], lon: rw[1] }, { lat: rw[2], lon: rw[3] }); // le → he (verdadeiro)
+  const len = SYM_LEN[a.t] || 12, h = SYM_H[a.t] || 4;
+  const box = len + 30; // espaço p/ cabeceiras
+  const col = surfColor(rw[4]);
+  // topo do glifo (após rotacionar por hdg) aponta p/ a cabeceira HE; base = LE
+  const nums = showIds
+    ? `<span class="apt-rwy-id" style="top:0;transform:translateX(-50%) rotate(${-hdg}deg)">${rw[7] || ''}</span>`
+    + `<span class="apt-rwy-id" style="bottom:0;transform:translateX(-50%) rotate(${-hdg}deg)">${rw[6] || ''}</span>`
+    : '';
+  const html = `<div class="apt-rwy" style="width:${box}px;height:${box}px;transform:rotate(${hdg}deg)">`
+    + `<span class="apt-rwy-bar" style="width:${h}px;height:${len}px;background:${col}"></span>${nums}</div>`;
+  return L.divIcon({ className: '', html, iconSize: [box, box], iconAnchor: [box / 2, box / 2] });
+}
+
+// símbolo simples (sem geometria/rumo): tracinho por porte + cor de piso
 function aptSymbol(a) {
   const len = SYM_LEN[a.t] || 10, h = SYM_H[a.t] || 4;
   return L.divIcon({
@@ -161,18 +183,18 @@ function renderAirportMarkers() {
   if (!airportGroup) return;
   airportGroup.clearLayers();
   const legend = document.getElementById('aptLegend');
-  if (!state.showAirports || map.getZoom() < AIRPORT_MIN_ZOOM) { if (legend) legend.classList.add('hidden'); return; }
+  const z = map.getZoom();
+  if (!state.showAirports || z < AIRPORT_MIN_ZOOM) { if (legend) legend.classList.add('hidden'); return; }
   if (legend) legend.classList.remove('hidden');
-  const drawRwy = map.getZoom() >= RUNWAY_ZOOM;
   const b = map.getBounds();
   let n = 0;
   for (const a of AIRPORT_MAP.values()) {
     if (a.lat < b.getSouth() || a.lat > b.getNorth() || a.lon < b.getWest() || a.lon > b.getEast()) continue;
-    const rws = drawRwy ? RUNWAYS.get(a.icao) : null;
-    if (rws && rws.length) {
-      // desenha cada pista como linha orientada, colorida pelo piso (com contorno p/ destaque)
-      const w = RWY_W[a.t] || 4;   // espessura = porte
-      const showIds = map.getZoom() >= RWYID_ZOOM;
+    const rws = RUNWAYS.get(a.icao);
+    if (rws && rws.length && z >= RUNWAY_ZOOM) {
+      // zoom perto: pista geográfica REAL (orientação e comprimento exatos) + cabeceiras
+      const w = RWY_W[a.t] || 4;
+      const showIds = z >= RWYID_ZOOM;
       rws.forEach(rw => {
         const pts = [[rw[0], rw[1]], [rw[2], rw[3]]];
         const casing = L.polyline(pts, { color: '#0b1219', weight: w + 3, opacity: .85, lineCap: 'butt' });
@@ -182,13 +204,15 @@ function renderAirportMarkers() {
           l.bindPopup(() => airportPopup(a), { minWidth: 200 });
           airportGroup.addLayer(l);
         });
-        if (showIds) {   // números de cabeceira nas pontas
+        if (showIds) {
           if (rw[6]) airportGroup.addLayer(rwyLabel([rw[0], rw[1]], rw[6]));
           if (rw[7]) airportGroup.addLayer(rwyLabel([rw[2], rw[3]], rw[7]));
         }
       });
     } else {
-      const m = L.marker([a.lat, a.lon], { icon: aptSymbol(a) });
+      // zoom afastado, ou sem geometria: ícone de pista inclinada (se houver rumo) ou tracinho
+      const icon = (rws && rws.length) ? runwayIcon(a, rws, z >= GLYPH_ID_ZOOM) : aptSymbol(a);
+      const m = L.marker([a.lat, a.lon], { icon });
       m.bindTooltip(a.icao, { direction: 'top', offset: [0, -6] });
       m.bindPopup(() => airportPopup(a), { minWidth: 200 });
       airportGroup.addLayer(m);
@@ -312,11 +336,22 @@ function onPos(p) {
 
   updateNavBanner();
 }
+const PLANE_SVG =
+  '<svg viewBox="0 0 64 64" width="42" height="42" xmlns="http://www.w3.org/2000/svg">'
+  + '<rect x="21" y="5" width="22" height="3" rx="1.5" fill="#1a1a1a"/>'                                  // hélice
+  + '<path d="M4 35 L60 35 L60 30 L35 25 L29 25 L4 30 Z" fill="#F2C200" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round"/>'  // asas
+  + '<rect x="2.5" y="28.5" width="8" height="7" rx="2.5" fill="#2a6cd6"/>'                                // ponta asa esq (azul)
+  + '<rect x="53.5" y="28.5" width="8" height="7" rx="2.5" fill="#2a6cd6"/>'                               // ponta asa dir (azul)
+  + '<path d="M32 7 C35.5 7 38 11 38 18 L38 48 C38 54 35.5 58 32 58 C28.5 58 26 54 26 48 L26 18 C26 11 28.5 7 32 7 Z" fill="#F2C200" stroke="#1a1a1a" stroke-width="2"/>'  // fuselagem
+  + '<path d="M19 53 L45 53 L45 50 L36 47.5 L28 47.5 L19 50 Z" fill="#F2C200" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round"/>'  // estabilizador
+  + '<ellipse cx="32" cy="23" rx="3.6" ry="6" fill="#143a5f"/>'                                            // cabine
+  + '</svg>';
+
 function planeIcon(heading) {
   return L.divIcon({
-    className:'',
-    html:`<div class="plane-icon" style="transform:rotate(${heading}deg)"><i class="fas fa-location-arrow"></i></div>`,
-    iconSize:[26,26], iconAnchor:[13,13]
+    className: '',
+    html: `<div class="plane-icon" style="transform:rotate(${heading}deg)">${PLANE_SVG}</div>`,
+    iconSize: [42, 42], iconAnchor: [21, 21]
   });
 }
 
