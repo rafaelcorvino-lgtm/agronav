@@ -1,11 +1,12 @@
 /* AgroNav service worker — instala como app e guarda cache p/ carregar mais rápido / offline parcial */
-const CACHE = 'agronav-v1';
+const CACHE = 'agronav-v2';
 const SHELL = [
   './',
   './index.html',
   './css/style.css',
   './js/app.js',
   './data/aerodromes.js',
+  './data/br-airports.json',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

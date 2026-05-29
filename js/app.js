@@ -423,40 +423,125 @@ function renderFields() {
 }
 
 /* ===================================================================
-   AERODROMES
+   AERODROMES — base completa BR (OurAirports) + base rica local (freq/pista)
    =================================================================== */
+const AIRPORT_MAP = new Map();   // ICAO -> {icao,name,city,uf,lat,lon,elev,rwy?,freq?}
+let airportsLoaded = false;
+
+function buildAirportIndex(brData) {
+  AIRPORT_MAP.clear();
+  // 1) base ampla (BR inteira)
+  (brData || []).forEach(r => {
+    const [icao, name, city, uf, lat, lon, elev] = r;
+    AIRPORT_MAP.set(icao, { icao, name, city, uf, lat, lon, elev });
+  });
+  // 2) base local rica: adiciona/sobrepõe pista + frequência
+  AERODROMES.forEach(a => {
+    const ex = AIRPORT_MAP.get(a.icao) || {};
+    AIRPORT_MAP.set(a.icao, Object.assign({}, ex, a));
+  });
+}
+
+function loadAirportsOnline() {
+  const hint = $('#wpLookupHint');
+  buildAirportIndex(null);            // começa só com a base local (offline garantido)
+  renderAero($('#aeroSearch').value);
+  if (hint) { hint.className = 'lookup-hint loading'; hint.textContent = 'Baixando base de aeródromos…'; }
+  fetch('data/br-airports.json', { cache: 'force-cache' })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(j => {
+      buildAirportIndex(j.data);
+      airportsLoaded = true;
+      renderAero($('#aeroSearch').value);
+      if (hint) { hint.className = 'lookup-hint'; hint.textContent = ''; }
+    })
+    .catch(() => {
+      if (hint) { hint.className = 'lookup-hint miss'; hint.textContent = 'Sem internet — usando base local (' + AERODROMES.length + ' aeródromos).'; }
+    });
+}
+
+function findAirport(code) { return AIRPORT_MAP.get((code || '').trim().toUpperCase()); }
+
 function renderAero(filter) {
   const q = (filter || '').trim().toUpperCase();
-  const list = AERODROMES.filter(a =>
-    !q || a.icao.includes(q) || a.name.toUpperCase().includes(q)
-    || a.city.toUpperCase().includes(q) || a.uf.includes(q));
   const tb = $('#aeroTable tbody');
+  const all = [...AIRPORT_MAP.values()];
+  let list = q
+    ? all.filter(a => a.icao.includes(q) || a.name.toUpperCase().includes(q)
+        || (a.city || '').toUpperCase().includes(q) || (a.uf || '') === q)
+    : all;
+  const total = list.length;
+  const CAP = 200;
+  list = list.slice(0, CAP);
   tb.innerHTML = '';
+  const frag = document.createDocumentFragment();
   list.forEach(a => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="icao-tag">${a.icao}</td><td>${a.name}</td>`
-      + `<td>${a.city}/${a.uf}</td><td>${a.rwy}</td>`
+      + `<td>${a.city || '—'}${a.uf ? '/' + a.uf : ''}</td><td>${a.rwy || '—'}</td>`
       + `<td style="white-space:nowrap">`
-      + `<button class="row-btn go" data-map='${a.icao}' title="Ver no mapa"><i class="fas fa-map-location-dot"></i></button>`
-      + `<button class="row-btn go" data-route='${a.icao}' title="Adicionar à rota"><i class="fas fa-plus"></i></button></td>`;
-    tb.appendChild(tr);
+      + `<button class="row-btn go" data-map="${a.icao}" title="Ver no mapa"><i class="fas fa-map-location-dot"></i></button>`
+      + `<button class="row-btn go" data-route="${a.icao}" title="Adicionar à rota"><i class="fas fa-plus"></i></button></td>`;
+    frag.appendChild(tr);
   });
-  $('#aeroCount').textContent = list.length + ' aeródromo(s)';
+  tb.appendChild(frag);
+  $('#aeroCount').textContent = total + ' aeródromo(s)' + (total > CAP ? ' — mostrando ' + CAP + ', refine a busca' : '');
   tb.querySelectorAll('[data-map]').forEach(b => b.addEventListener('click', () => {
-    const a = AERODROMES.find(x => x.icao === b.dataset.map);
+    const a = findAirport(b.dataset.map); if (!a) return;
     showPage('map');
     setTimeout(() => {
       map.setView([a.lat, a.lon], 13);
-      L.popup().setLatLng([a.lat, a.lon])
-        .setContent(`<b>${a.icao}</b> — ${a.name}<br>${a.city}/${a.uf}<br>Elev ${a.elev} ft · Pista ${a.rwy}<br>Freq ${a.freq.toFixed(2)}`)
-        .openOn(map);
+      let html = `<b>${a.icao}</b> — ${a.name}<br>${a.city || ''}${a.uf ? '/' + a.uf : ''}`;
+      if (a.elev != null) html += `<br>Elev ${a.elev} ft`;
+      if (a.rwy) html += ` · Pista ${a.rwy}`;
+      if (a.freq) html += `<br>Freq ${a.freq.toFixed(2)}`;
+      L.popup().setLatLng([a.lat, a.lon]).setContent(html).openOn(map);
     }, 120);
   }));
   tb.querySelectorAll('[data-route]').forEach(b => b.addEventListener('click', () => {
-    const a = AERODROMES.find(x => x.icao === b.dataset.route);
-    addWaypoint({ name:a.icao, lat:a.lat, lon:a.lon });
+    const a = findAirport(b.dataset.route); if (!a) return;
+    addWaypoint({ name: a.icao, lat: a.lat, lon: a.lon });
     toast(a.icao + ' adicionado à rota');
   }));
+}
+
+/* ---------- Autocomplete ICAO no campo "Adicionar ponto" ---------- */
+function wireIcaoLookup() {
+  const input = $('#wpName'), dl = $('#icaoList'), hint = $('#wpLookupHint');
+  let t;
+  input.addEventListener('input', () => {
+    const raw = input.value.trim();
+    const code = raw.toUpperCase();
+    const exact = AIRPORT_MAP.get(code);
+    if (exact) {
+      $('#wpLat').value = exact.lat;
+      $('#wpLon').value = exact.lon;
+      hint.className = 'lookup-hint ok';
+      hint.textContent = `✔ ${exact.name}${exact.city ? ' — ' + exact.city + '/' + exact.uf : ''}`;
+    } else {
+      hint.className = 'lookup-hint';
+      hint.textContent = '';
+    }
+    clearTimeout(t);
+    t = setTimeout(() => buildIcaoSuggestions(code), 130);
+  });
+}
+function buildIcaoSuggestions(code) {
+  const dl = $('#icaoList');
+  dl.innerHTML = '';
+  if (!/^[A-Z0-9]{2,4}$/.test(code)) return;
+  let n = 0;
+  const frag = document.createDocumentFragment();
+  for (const a of AIRPORT_MAP.values()) {
+    if (a.icao.startsWith(code)) {
+      const o = document.createElement('option');
+      o.value = a.icao;
+      o.label = `${a.name}${a.city ? ' — ' + a.city + '/' + a.uf : ''}`;
+      frag.appendChild(o);
+      if (++n >= 12) break;
+    }
+  }
+  dl.appendChild(frag);
 }
 
 /* ===================================================================
@@ -649,10 +734,11 @@ function init() {
   initMap();
   addDrawButton();
   wire();
+  wireIcaoLookup();
   loadCfgUI();
   renderRoute();
   renderFields();
-  renderAero();
+  loadAirportsOnline();
   // run E6B defaults
   calcWindTriangle(); calcRunwayWind(); calcTSD(); calcDensityAlt(); calcConvert();
 }

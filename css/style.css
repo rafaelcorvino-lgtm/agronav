@@ -108,6 +108,10 @@ body {
 .field label { font-size:12px; color:var(--text-secondary); font-weight:600; }
 .field input, .field select { background:var(--bg-input); border:1px solid var(--border-color); border-radius:8px; padding:10px 12px; color:var(--text-primary); font-size:14px; font-family:inherit; width:100%; }
 .field input:focus, .field select:focus { outline:none; border-color:var(--accent-cyan); }
+.lookup-hint { font-size:12px; margin-top:4px; min-height:16px; font-weight:600; }
+.lookup-hint.ok { color:var(--accent-green); }
+.lookup-hint.miss { color:var(--accent-orange); }
+.lookup-hint.loading { color:var(--text-muted); }
 .hint { font-size:12px; color:var(--text-muted); margin-top:8px; line-height:1.5; }
 .hint i { color:var(--accent-cyan); }
 

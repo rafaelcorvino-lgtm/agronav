@@ -87,7 +87,7 @@
                 <div class="card">
                     <div class="card-head"><h3>Adicionar ponto</h3></div>
                     <div class="grid-2">
-                        <div class="field"><label>Nome / ICAO</label><input type="text" id="wpName" placeholder="Ex: SBSP ou Talhão 4"></div>
+                        <div class="field"><label>Nome / ICAO</label><input type="text" id="wpName" placeholder="Ex: SBSP ou Talhão 4" list="icaoList" autocomplete="off"><datalist id="icaoList"></datalist><span class="lookup-hint" id="wpLookupHint"></span></div>
                         <div class="field"><label>Latitude (decimal)</label><input type="number" step="any" id="wpLat" placeholder="-23.6266"></div>
                         <div class="field"><label>Longitude (decimal)</label><input type="number" step="any" id="wpLon" placeholder="-46.6556"></div>
                         <div class="field end"><button class="btn btn-primary" id="btnAddRoutePt"><i class="fas fa-plus"></i> Adicionar à rota</button></div>
