@@ -79,6 +79,12 @@ body {
 .hud-unit { font-size:9px; color:var(--text-muted); }
 
 .apt-legend { position:fixed; bottom:16px; left:calc(var(--sidebar-width) + 14px); z-index:500; background:rgba(15,25,35,.85); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:var(--radius); padding:8px 12px; box-shadow:var(--shadow); font-size:12px; display:flex; flex-direction:column; gap:5px; }
+.apt-legend { padding-right:24px; }
+.leg-close { position:absolute; top:4px; right:4px; width:20px; height:20px; border:none; background:transparent; color:var(--text-muted); font-size:18px; line-height:1; cursor:pointer; border-radius:4px; }
+.leg-close:hover { color:var(--accent-red); background:rgba(239,68,68,.12); }
+.leg-restore { position:fixed; bottom:16px; left:calc(var(--sidebar-width) + 14px); z-index:500; display:inline-flex; align-items:center; gap:6px; background:rgba(15,25,35,.85); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:var(--radius); padding:7px 12px; box-shadow:var(--shadow); color:var(--text-secondary); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; }
+.leg-restore:hover { color:var(--text-primary); }
+.leg-restore i { color:var(--accent-cyan); }
 .apt-legend .leg-title { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); font-weight:700; margin-bottom:2px; }
 .apt-legend .leg-row { display:flex; align-items:center; gap:8px; color:var(--text-secondary); white-space:nowrap; }
 .apt-legend .leg-bar { width:18px; height:5px; border-radius:2px; border:1px solid rgba(0,0,0,.5); flex:none; box-sizing:border-box; }
@@ -229,6 +235,7 @@ body {
     .hud-item { min-width:42px; }
     .hud-val { font-size:17px; }
     .apt-legend { left:10px; bottom:10px; padding:6px 10px; font-size:11px; }
+    .leg-restore { left:10px; bottom:10px; }
     .nav-banner { left:10px; right:10px; bottom:66px; transform:none; min-width:0; }
     .menu-toggle { display:block; }
     .sidebar.open ~ .sidebar-overlay { display:block; }

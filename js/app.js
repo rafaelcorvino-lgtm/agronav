@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v15';
+const APP_VERSION = 'v16';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -31,7 +31,8 @@ const state = {
   pos: null,
   activeNavIdx: 0,
   showAirports: true,
-  gotoTarget: null
+  gotoTarget: null,
+  legendHidden: LS.get('legendHidden', false)
 };
 
 /* ---------- Geo math ---------- */
@@ -149,6 +150,20 @@ const RWYID_ZOOM = 12;                          // >= isto: cabeceiras na pista 
 const GLYPH_ID_ZOOM = 10;                       // >= isto: cabeceiras no ícone inclinado (zoom afastado)
 let RUNWAYS = new Map();                        // ICAO -> [[le_lat,le_lon,he_lat,he_lon,surf,len_ft], ...]
 
+// mostra a legenda, ou o botão "Legenda" se o usuário a escondeu
+function updateLegendUI(canShow) {
+  const legend = $('#aptLegend'), restore = $('#legRestore');
+  if (!legend) return;
+  if (!canShow) { legend.classList.add('hidden'); if (restore) restore.classList.add('hidden'); return; }
+  if (state.legendHidden) {
+    legend.classList.add('hidden');
+    if (restore) restore.classList.remove('hidden');
+  } else {
+    legend.classList.remove('hidden');
+    if (restore) restore.classList.add('hidden');
+  }
+}
+
 function rwyLabel(ll, txt) {
   return L.marker(ll, {
     icon: L.divIcon({ className: '', html: `<span class="rwy-id">${txt}</span>`, iconSize: [0, 0] }),
@@ -190,10 +205,10 @@ function aptSymbol(a) {
 function renderAirportMarkers() {
   if (!airportGroup) return;
   airportGroup.clearLayers();
-  const legend = document.getElementById('aptLegend');
   const z = map.getZoom();
-  if (!state.showAirports || z < AIRPORT_MIN_ZOOM) { if (legend) legend.classList.add('hidden'); return; }
-  if (legend) legend.classList.remove('hidden');
+  const canShowLegend = state.showAirports && z >= AIRPORT_MIN_ZOOM;
+  updateLegendUI(canShowLegend);
+  if (!state.showAirports || z < AIRPORT_MIN_ZOOM) return;
   const b = map.getBounds();
   let n = 0;
   for (const a of AIRPORT_MAP.values()) {
@@ -851,6 +866,8 @@ function wire() {
   $('#btnFollow').classList.toggle('active', state.follow);
   $('#btnLayer').addEventListener('click', switchLayer);
   $('#navClose').addEventListener('click', clearGoto);
+  $('#legClose').addEventListener('click', () => { state.legendHidden = true; LS.set('legendHidden', true); renderAirportMarkers(); });
+  $('#legRestore').addEventListener('click', () => { state.legendHidden = false; LS.set('legendHidden', false); renderAirportMarkers(); });
   $('#btnTrack').addEventListener('click', () => {
     state.tracking = !state.tracking;
     $('#btnTrack').classList.toggle('active', state.tracking);
