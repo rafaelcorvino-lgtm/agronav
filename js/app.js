@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v17';
+const APP_VERSION = 'v18';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -389,6 +389,8 @@ function onPos(p) {
 
   const gsKt = c.speed != null ? c.speed * 1.94384 : null;       // m/s → kt
   state.lastGsKt = gsKt;
+  state.lastAltM = (c.altitude != null && !isNaN(c.altitude)) ? c.altitude : null;
+  maybeQueryTerrain(c.latitude, c.longitude);
   const trk = c.heading != null && !isNaN(c.heading) ? c.heading : null;
   const altFt = c.altitude != null ? c.altitude * 3.28084 : null;
 
@@ -432,6 +434,35 @@ function planeIcon(heading) {
   });
 }
 
+/* ---------- Elevação do terreno (p/ altura AGL) ---------- */
+let terrainBusy = false, lastTerrainPt = null, lastTerrainTime = 0;
+function maybeQueryTerrain(lat, lon) {
+  if (terrainBusy) return;
+  const now = Date.now();
+  if (lastTerrainPt) {
+    const d = haversineNM(lastTerrainPt, { lat, lon });
+    if (d < 0.08 && (now - lastTerrainTime) < 12000) return;   // ~<150 m e <12 s: reaproveita
+  }
+  terrainBusy = true;
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 8000);
+  fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat.toFixed(5)},${lon.toFixed(5)}`, { signal: ctrl.signal })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(j => {
+      const e = j && j.results && j.results[0] && j.results[0].elevation;
+      if (typeof e === 'number') { state.terrainM = e; lastTerrainPt = { lat, lon }; lastTerrainTime = Date.now(); }
+    })
+    .catch(() => {})
+    .then(() => { clearTimeout(to); terrainBusy = false; });
+}
+function aglFt() {
+  if (state.lastAltM == null || state.terrainM == null) return null;
+  return (state.lastAltM - state.terrainM) * 3.28084;
+}
+function fmtClock(d) {
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 /* ---------- Nav banner (to next waypoint) ---------- */
 function updateNavBanner() {
   const banner = $('#navBanner');
@@ -441,10 +472,15 @@ function updateNavBanner() {
   if (!target) { banner.classList.add('hidden'); if (gotoLine) gotoLine.setLatLngs([]); return; }
   banner.classList.remove('hidden');
   $('#nav-to-name').textContent = target.name;
+  // GS e AGL (estado atual da aeronave)
+  $('#nav-gs').textContent = (state.lastGsKt != null) ? Math.round(state.lastGsKt) : '--';
+  const agl = aglFt();
+  $('#nav-agl').textContent = (agl != null) ? Math.round(agl) : '--';
   if (!state.pos) {                 // sem GPS: mostra destino, pede GPS
     $('#nav-dist').textContent = '--';
     $('#nav-brg').textContent = '--';
     $('#nav-ete').textContent = 'GPS?';
+    $('#nav-eta').textContent = '--';
     if (state.gotoTarget) gotoLine.setLatLngs([]);
     return;
   }
@@ -452,8 +488,11 @@ function updateNavBanner() {
   const brg = toMag(bearingTrue(state.pos, target));
   $('#nav-dist').textContent = dist.toFixed(1);
   $('#nav-brg').textContent = fmtDeg(brg);
+  // ETE e ETA pela velocidade do solo real (GS) — cai p/ TAS de cruzeiro se parado
   const gs = (state.lastGsKt && state.lastGsKt > 5) ? state.lastGsKt : (Number(state.cfg.tas) || 110);
-  $('#nav-ete').textContent = fmtHM(dist / gs);
+  const eteH = dist / gs;
+  $('#nav-ete').textContent = fmtHM(eteH);
+  $('#nav-eta').textContent = isFinite(eteH) ? fmtClock(new Date(Date.now() + eteH * 3600000)) : '--';
   if (state.gotoTarget) gotoLine.setLatLngs([[state.pos.lat, state.pos.lon], [target.lat, target.lon]]);
   // auto-avança waypoint só quando navegando uma rota
   if (!state.gotoTarget && dist < 0.5 && state.activeNavIdx < state.route.length - 1) state.activeNavIdx++;

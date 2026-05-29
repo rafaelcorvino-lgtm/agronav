@@ -99,7 +99,7 @@ body {
 
 .nav-banner { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:500; background:rgba(15,25,35,.9); backdrop-filter:blur(8px); border:1px solid var(--accent-cyan); border-radius:var(--radius); padding:10px 18px; box-shadow:var(--shadow); min-width:300px; }
 .nav-banner-to { display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; color:var(--accent-cyan); margin-bottom:6px; }
-.nav-banner-data { display:flex; gap:18px; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
+.nav-banner-data { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
 .nb-label { display:block; font-size:9px; color:var(--text-muted); font-weight:600; letter-spacing:1px; }
 .nav-banner-close { position:absolute; top:-10px; right:-10px; width:26px; height:26px; border-radius:50%; border:1px solid var(--border-color); background:var(--bg-card); color:var(--text-secondary); font-size:18px; line-height:1; cursor:pointer; box-shadow:var(--shadow); }
 .nav-banner-close:hover { color:var(--accent-red); }
