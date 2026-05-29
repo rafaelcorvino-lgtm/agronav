@@ -131,7 +131,9 @@ function initMap() {
 const SURF_COLOR = { asf: '#64748b', terra: '#b45309', grama: '#22c55e', outro: '#9ca3af', '': '#9ca3af' };
 const SURF_LABEL = { asf: 'Asfalto', terra: 'Terra', grama: 'Grama', outro: 'Outro' };
 function surfColor(s) { return SURF_COLOR[s] || '#9ca3af'; }
-const TYPE_R = { 3: 7, 2: 6, 1: 4, 0: 5 };   // raio do ponto por tipo (em zoom baixo)
+// PORTE do aeródromo (tipo): controla o TAMANHO do símbolo (3=grande,2=médio,1=peq,0=hidro)
+const TYPE_R = { 3: 9, 2: 6, 1: 4, 0: 5 };    // raio do ponto (zoom baixo)
+const RWY_W  = { 3: 7, 2: 5, 1: 3.5, 0: 4 };  // espessura da pista desenhada (zoom alto)
 const RUNWAY_ZOOM = 12;                        // a partir daqui desenha a pista de verdade
 let RUNWAYS = new Map();                        // ICAO -> [[le_lat,le_lon,he_lat,he_lon,surf,len_ft], ...]
 
@@ -149,10 +151,11 @@ function renderAirportMarkers() {
     const rws = drawRwy ? RUNWAYS.get(a.icao) : null;
     if (rws && rws.length) {
       // desenha cada pista como linha orientada, colorida pelo piso (com contorno p/ destaque)
+      const w = RWY_W[a.t] || 4;   // espessura = porte
       rws.forEach(rw => {
         const pts = [[rw[0], rw[1]], [rw[2], rw[3]]];
-        const casing = L.polyline(pts, { color: '#0b1219', weight: 8, opacity: .85, lineCap: 'butt' });
-        const top = L.polyline(pts, { color: surfColor(rw[4]), weight: 5, opacity: 1, lineCap: 'butt' });
+        const casing = L.polyline(pts, { color: '#0b1219', weight: w + 3, opacity: .85, lineCap: 'butt' });
+        const top = L.polyline(pts, { color: surfColor(rw[4]), weight: w, opacity: 1, lineCap: 'butt' });
         [casing, top].forEach(l => {
           l.bindTooltip(a.icao, { direction: 'top', sticky: true });
           l.bindPopup(() => airportPopup(a), { minWidth: 200 });
