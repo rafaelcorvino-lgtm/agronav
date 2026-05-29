@@ -79,8 +79,9 @@ body {
 .hud-unit { font-size:9px; color:var(--text-muted); }
 
 .apt-legend { position:fixed; bottom:16px; left:calc(var(--sidebar-width) + 14px); z-index:500; background:rgba(15,25,35,.85); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:var(--radius); padding:8px 12px; box-shadow:var(--shadow); font-size:12px; display:flex; flex-direction:column; gap:5px; }
+.apt-legend .leg-title { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); font-weight:700; margin-bottom:2px; }
 .apt-legend .leg-row { display:flex; align-items:center; gap:8px; color:var(--text-secondary); white-space:nowrap; }
-.apt-legend .leg-dot { width:11px; height:11px; border-radius:50%; border:1px solid rgba(0,0,0,.45); flex:none; box-sizing:border-box; }
+.apt-legend .leg-bar { width:18px; height:5px; border-radius:2px; border:1px solid rgba(0,0,0,.5); flex:none; box-sizing:border-box; }
 
 .map-controls { position:fixed; top:14px; right:14px; z-index:500; display:flex; flex-direction:column; gap:8px; }
 .map-btn { width:44px; height:44px; border-radius:var(--radius); border:1px solid var(--border-color); background:rgba(15,25,35,.88); color:var(--text-primary); font-size:17px; cursor:pointer; box-shadow:var(--shadow); transition:all .15s; }

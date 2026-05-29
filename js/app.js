@@ -127,33 +127,46 @@ function initMap() {
 }
 
 /* ---------- Aeródromos no mapa ---------- */
-// cores por tipo: 3=grande, 2=médio, 1=pequeno/fazenda, 0=hidroavião
-const APT_STYLE = {
-  3: { color: '#3b82f6', r: 7 },
-  2: { color: '#22c55e', r: 6 },
-  1: { color: '#f59e0b', r: 4 },
-  0: { color: '#a855f7', r: 5 }
-};
-function aptStyle(t) { return APT_STYLE[t] || { color: '#8a9bb0', r: 4 }; }
+// cor por piso: asf=asfalto, terra=terra/cascalho, grama=grama, outro/desconhecido
+const SURF_COLOR = { asf: '#64748b', terra: '#b45309', grama: '#22c55e', outro: '#9ca3af', '': '#9ca3af' };
+const SURF_LABEL = { asf: 'Asfalto', terra: 'Terra', grama: 'Grama', outro: 'Outro' };
+function surfColor(s) { return SURF_COLOR[s] || '#9ca3af'; }
+const TYPE_R = { 3: 7, 2: 6, 1: 4, 0: 5 };   // raio do ponto por tipo (em zoom baixo)
+const RUNWAY_ZOOM = 12;                        // a partir daqui desenha a pista de verdade
+let RUNWAYS = new Map();                        // ICAO -> [[le_lat,le_lon,he_lat,he_lon,surf,len_ft], ...]
 
 function renderAirportMarkers() {
   if (!airportGroup) return;
   airportGroup.clearLayers();
   const legend = document.getElementById('aptLegend');
-  if (!state.showAirports) { if (legend) legend.classList.add('hidden'); return; }
-  if (map.getZoom() < AIRPORT_MIN_ZOOM) { if (legend) legend.classList.add('hidden'); return; }
+  if (!state.showAirports || map.getZoom() < AIRPORT_MIN_ZOOM) { if (legend) legend.classList.add('hidden'); return; }
   if (legend) legend.classList.remove('hidden');
+  const drawRwy = map.getZoom() >= RUNWAY_ZOOM;
   const b = map.getBounds();
   let n = 0;
   for (const a of AIRPORT_MAP.values()) {
     if (a.lat < b.getSouth() || a.lat > b.getNorth() || a.lon < b.getWest() || a.lon > b.getEast()) continue;
-    const st = aptStyle(a.t);
-    const m = L.circleMarker([a.lat, a.lon], {
-      radius: st.r, color: '#0b1219', weight: 1.5, fillColor: st.color, fillOpacity: .95
-    });
-    m.bindTooltip(a.icao, { direction: 'top', offset: [0, -4] });
-    m.bindPopup(() => airportPopup(a), { minWidth: 200 });
-    airportGroup.addLayer(m);
+    const rws = drawRwy ? RUNWAYS.get(a.icao) : null;
+    if (rws && rws.length) {
+      // desenha cada pista como linha orientada, colorida pelo piso (com contorno p/ destaque)
+      rws.forEach(rw => {
+        const pts = [[rw[0], rw[1]], [rw[2], rw[3]]];
+        const casing = L.polyline(pts, { color: '#0b1219', weight: 8, opacity: .85, lineCap: 'butt' });
+        const top = L.polyline(pts, { color: surfColor(rw[4]), weight: 5, opacity: 1, lineCap: 'butt' });
+        [casing, top].forEach(l => {
+          l.bindTooltip(a.icao, { direction: 'top', sticky: true });
+          l.bindPopup(() => airportPopup(a), { minWidth: 200 });
+          airportGroup.addLayer(l);
+        });
+      });
+    } else {
+      const m = L.circleMarker([a.lat, a.lon], {
+        radius: (TYPE_R[a.t] || 4), color: '#0b1219', weight: 1.5, fillColor: surfColor(a.s), fillOpacity: .95
+      });
+      m.bindTooltip(a.icao, { direction: 'top', offset: [0, -4] });
+      m.bindPopup(() => airportPopup(a), { minWidth: 200 });
+      airportGroup.addLayer(m);
+    }
     if (++n >= AIRPORT_MAX_MARKERS) break;
   }
 }
@@ -166,6 +179,7 @@ function airportPopup(a) {
   const bits = [];
   if (a.elev != null) bits.push(`Elev ${a.elev} ft`);
   if (a.rwy) bits.push(`Pista ${a.rwy}`);
+  else if (a.s && SURF_LABEL[a.s]) bits.push(`Piso ${SURF_LABEL[a.s]}`);
   if (a.freq) bits.push(`Freq ${a.freq.toFixed(2)}`);
   if (bits.length) info += `<br><span class="apt-meta">${bits.join(' · ')}</span>`;
   div.innerHTML = `<div class="apt-info">${info}</div>
@@ -517,8 +531,8 @@ function buildAirportIndex(brData) {
   AIRPORT_MAP.clear();
   // 1) base ampla (BR inteira)
   (brData || []).forEach(r => {
-    const [icao, name, city, uf, lat, lon, elev, t] = r;
-    AIRPORT_MAP.set(icao, { icao, name, city, uf, lat, lon, elev, t });
+    const [icao, name, city, uf, lat, lon, elev, t, s] = r;
+    AIRPORT_MAP.set(icao, { icao, name, city, uf, lat, lon, elev, t, s });
   });
   // 2) base local rica: adiciona/sobrepõe pista + frequência
   AERODROMES.forEach(a => {
@@ -540,6 +554,11 @@ function loadAirportsOnline() {
       renderAero($('#aeroSearch').value);
       renderAirportMarkers();
       if (hint) { hint.className = 'lookup-hint'; hint.textContent = ''; }
+      // carrega geometria das pistas (desenho por piso) — não bloqueia o resto
+      fetch('data/br-runways.json', { cache: 'force-cache' })
+        .then(r => r.ok ? r.json() : null)
+        .then(rj => { if (rj && rj.data) { RUNWAYS = new Map(Object.entries(rj.data)); renderAirportMarkers(); } })
+        .catch(() => {});
     })
     .catch(() => {
       if (hint) { hint.className = 'lookup-hint miss'; hint.textContent = 'Sem internet — usando base local (' + AERODROMES.length + ' aeródromos).'; }
