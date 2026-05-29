@@ -87,6 +87,21 @@ body {
 .nav-banner-to { display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; color:var(--accent-cyan); margin-bottom:6px; }
 .nav-banner-data { display:flex; gap:18px; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
 .nb-label { display:block; font-size:9px; color:var(--text-muted); font-weight:600; letter-spacing:1px; }
+.nav-banner-close { position:absolute; top:-10px; right:-10px; width:26px; height:26px; border-radius:50%; border:1px solid var(--border-color); background:var(--bg-card); color:var(--text-secondary); font-size:18px; line-height:1; cursor:pointer; box-shadow:var(--shadow); }
+.nav-banner-close:hover { color:var(--accent-red); }
+
+/* Popup de aeródromo (Leaflet) */
+.leaflet-popup-content-wrapper { background:var(--bg-card); color:var(--text-primary); border-radius:var(--radius); border:1px solid var(--border-color); }
+.leaflet-popup-tip { background:var(--bg-card); }
+.leaflet-popup-content { margin:12px 14px; font-size:13px; line-height:1.5; }
+.leaflet-container a.leaflet-popup-close-button { color:var(--text-muted); }
+.apt-popup .apt-info b { color:var(--accent-cyan); font-size:15px; }
+.apt-popup .apt-name { font-weight:600; }
+.apt-popup .apt-meta { color:var(--text-secondary); font-size:12px; }
+.apt-actions { display:flex; gap:8px; margin-top:10px; }
+.apt-actions .btn { padding:8px 10px; font-size:12px; flex:1; justify-content:center; }
+.leaflet-tooltip { background:rgba(15,25,35,.9); border:1px solid var(--accent-orange); color:var(--accent-orange); font-weight:700; font-size:11px; }
+.leaflet-tooltip-top:before { border-top-color:var(--accent-orange); }
 
 /* ===== CARDS ===== */
 .card { background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius); padding:18px; margin-bottom:18px; box-shadow:var(--shadow); }

@@ -27,7 +27,9 @@ const state = {
   watchId: null,
   layerIdx: 0,
   pos: null,
-  activeNavIdx: 0
+  activeNavIdx: 0,
+  showAirports: true,
+  gotoTarget: null
 };
 
 /* ---------- Geo math ---------- */
@@ -94,9 +96,11 @@ $('#sidebarOverlay').addEventListener('click', closeSidebar);
 /* ===================================================================
    MAP
    =================================================================== */
-let map, posMarker, posAccCircle, trackLine, routeLine, drawLine;
+let map, posMarker, posAccCircle, trackLine, routeLine, drawLine, gotoLine, airportGroup;
 const wpMarkers = [];
 const fieldLayers = [];
+const AIRPORT_MIN_ZOOM = 8;   // abaixo disso são muitos aeródromos — não plota
+const AIRPORT_MAX_MARKERS = 600;
 
 const baseLayers = [
   { name:'Mapa', layer:() => L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }) },
@@ -113,10 +117,69 @@ function initMap() {
   routeLine = L.polyline([], { color:'#06b6d4', weight:3, dashArray:'1', opacity:.9 }).addTo(map);
   trackLine = L.polyline([], { color:'#22c55e', weight:3, opacity:.85 }).addTo(map);
   drawLine = L.polygon([], { color:'#f59e0b', weight:2, fillOpacity:.15 }).addTo(map);
+  gotoLine = L.polyline([], { color:'#f59e0b', weight:3, dashArray:'8,7', opacity:.9 }).addTo(map);
+  airportGroup = L.layerGroup().addTo(map);
 
   map.on('click', onMapClick);
+  map.on('moveend', renderAirportMarkers);
   drawRouteOnMap();
   drawFieldsOnMap();
+}
+
+/* ---------- Aeródromos no mapa ---------- */
+function renderAirportMarkers() {
+  if (!airportGroup) return;
+  airportGroup.clearLayers();
+  if (!state.showAirports) return;
+  if (map.getZoom() < AIRPORT_MIN_ZOOM) return;     // muitos aeródromos em zoom baixo
+  const b = map.getBounds();
+  let n = 0;
+  for (const a of AIRPORT_MAP.values()) {
+    if (a.lat < b.getSouth() || a.lat > b.getNorth() || a.lon < b.getWest() || a.lon > b.getEast()) continue;
+    const m = L.circleMarker([a.lat, a.lon], {
+      radius: 5, color: '#f59e0b', weight: 2, fillColor: '#1e2d3d', fillOpacity: 1
+    });
+    m.bindTooltip(a.icao, { direction: 'top', offset: [0, -4] });
+    m.bindPopup(() => airportPopup(a), { minWidth: 200 });
+    airportGroup.addLayer(m);
+    if (++n >= AIRPORT_MAX_MARKERS) break;
+  }
+}
+
+function airportPopup(a) {
+  const div = document.createElement('div');
+  div.className = 'apt-popup';
+  let info = `<b>${a.icao}</b><br><span class="apt-name">${a.name}</span>`;
+  if (a.city) info += `<br>${a.city}${a.uf ? '/' + a.uf : ''}`;
+  const bits = [];
+  if (a.elev != null) bits.push(`Elev ${a.elev} ft`);
+  if (a.rwy) bits.push(`Pista ${a.rwy}`);
+  if (a.freq) bits.push(`Freq ${a.freq.toFixed(2)}`);
+  if (bits.length) info += `<br><span class="apt-meta">${bits.join(' · ')}</span>`;
+  div.innerHTML = `<div class="apt-info">${info}</div>
+    <div class="apt-actions">
+      <button class="btn btn-primary apt-goto"><i class="fas fa-diamond-turn-right"></i> Navegar até</button>
+      <button class="btn btn-ghost apt-add"><i class="fas fa-plus"></i> Rota</button>
+    </div>`;
+  div.querySelector('.apt-goto').addEventListener('click', () => { directTo(a); map.closePopup(); });
+  div.querySelector('.apt-add').addEventListener('click', () => {
+    addWaypoint({ name: a.icao, lat: a.lat, lon: a.lon });
+    toast(a.icao + ' adicionado à rota'); map.closePopup();
+  });
+  return div;
+}
+
+/* ---------- Navegação direta (Direct-To) ---------- */
+function directTo(a) {
+  state.gotoTarget = { name: a.icao || a.name, lat: a.lat, lon: a.lon };
+  updateNavBanner();
+  if (state.watchId === null) toast('Navegando até ' + state.gotoTarget.name + ' — ative o GPS p/ dados ao vivo');
+  else toast('Navegando até ' + state.gotoTarget.name);
+}
+function clearGoto() {
+  state.gotoTarget = null;
+  gotoLine.setLatLngs([]);
+  updateNavBanner();
 }
 
 function switchLayer() {
@@ -172,6 +235,7 @@ function onPos(p) {
   setGpsBadge('gps-on', 'ativo');
 
   const gsKt = c.speed != null ? c.speed * 1.94384 : null;       // m/s → kt
+  state.lastGsKt = gsKt;
   const trk = c.heading != null && !isNaN(c.heading) ? c.heading : null;
   const altFt = c.altitude != null ? c.altitude * 3.28084 : null;
 
@@ -207,19 +271,28 @@ function planeIcon(heading) {
 /* ---------- Nav banner (to next waypoint) ---------- */
 function updateNavBanner() {
   const banner = $('#navBanner');
-  if (!state.pos || state.route.length === 0) { banner.classList.add('hidden'); return; }
-  // target = first route point ahead (simple: nearest of remaining), default first
-  const target = state.route[Math.min(state.activeNavIdx, state.route.length - 1)];
-  const dist = haversineNM(state.pos, target);
-  const brg = toMag(bearingTrue(state.pos, target));
+  // "Navegar até" (direct-to) tem prioridade; senão segue a rota
+  const target = state.gotoTarget
+    || (state.route.length ? state.route[Math.min(state.activeNavIdx, state.route.length - 1)] : null);
+  if (!target) { banner.classList.add('hidden'); if (gotoLine) gotoLine.setLatLngs([]); return; }
   banner.classList.remove('hidden');
   $('#nav-to-name').textContent = target.name;
+  if (!state.pos) {                 // sem GPS: mostra destino, pede GPS
+    $('#nav-dist').textContent = '--';
+    $('#nav-brg').textContent = '--';
+    $('#nav-ete').textContent = 'GPS?';
+    if (state.gotoTarget) gotoLine.setLatLngs([]);
+    return;
+  }
+  const dist = haversineNM(state.pos, target);
+  const brg = toMag(bearingTrue(state.pos, target));
   $('#nav-dist').textContent = dist.toFixed(1);
   $('#nav-brg').textContent = fmtDeg(brg);
-  const gs = Number(state.cfg.tas) || 110;
+  const gs = (state.lastGsKt && state.lastGsKt > 5) ? state.lastGsKt : (Number(state.cfg.tas) || 110);
   $('#nav-ete').textContent = fmtHM(dist / gs);
-  // auto-advance when within 0.5 NM
-  if (dist < 0.5 && state.activeNavIdx < state.route.length - 1) state.activeNavIdx++;
+  if (state.gotoTarget) gotoLine.setLatLngs([[state.pos.lat, state.pos.lon], [target.lat, target.lon]]);
+  // auto-avança waypoint só quando navegando uma rota
+  if (!state.gotoTarget && dist < 0.5 && state.activeNavIdx < state.route.length - 1) state.activeNavIdx++;
 }
 
 /* ===================================================================
@@ -453,6 +526,7 @@ function loadAirportsOnline() {
       buildAirportIndex(j.data);
       airportsLoaded = true;
       renderAero($('#aeroSearch').value);
+      renderAirportMarkers();
       if (hint) { hint.className = 'lookup-hint'; hint.textContent = ''; }
     })
     .catch(() => {
@@ -658,6 +732,7 @@ function wire() {
   });
   $('#btnFollow').classList.toggle('active', state.follow);
   $('#btnLayer').addEventListener('click', switchLayer);
+  $('#navClose').addEventListener('click', clearGoto);
   $('#btnTrack').addEventListener('click', () => {
     state.tracking = !state.tracking;
     $('#btnTrack').classList.toggle('active', state.tracking);
@@ -725,6 +800,19 @@ function addDrawButton() {
   btn.innerHTML = '<i class="fas fa-draw-polygon"></i>';
   btn.addEventListener('click', () => { toggleDraw(); btn.classList.toggle('active', state.drawMode); });
   $('.map-controls').appendChild(btn);
+
+  // botão liga/desliga aeródromos no mapa
+  const aptBtn = document.createElement('button');
+  aptBtn.className = 'map-btn' + (state.showAirports ? ' active' : '');
+  aptBtn.id = 'btnAirports'; aptBtn.title = 'Mostrar/ocultar aeródromos';
+  aptBtn.innerHTML = '<i class="fas fa-tower-control"></i>';
+  aptBtn.addEventListener('click', () => {
+    state.showAirports = !state.showAirports;
+    aptBtn.classList.toggle('active', state.showAirports);
+    renderAirportMarkers();
+    toast(state.showAirports ? 'Aeródromos no mapa: ligado (dê zoom p/ ver)' : 'Aeródromos no mapa: desligado');
+  });
+  $('.map-controls').appendChild(aptBtn);
 }
 
 /* ===================================================================
