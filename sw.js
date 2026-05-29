@@ -1,5 +1,10 @@
-/* AgroNav service worker — instala como app e guarda cache p/ carregar mais rápido / offline parcial */
-const CACHE = 'agronav-v2';
+/* AgroNav service worker
+   Estratégia:
+   - Arquivos do próprio app (mesma origem): REDE PRIMEIRO → sempre pega a versão nova
+     quando há internet; cai pro cache só offline. (evita ficar preso em versão velha)
+   - Recursos externos (tiles do mapa, Leaflet, FontAwesome): CACHE PRIMEIRO → rápido e
+     funciona offline depois da 1ª visita. */
+const CACHE = 'agronav-v3';
 const SHELL = [
   './',
   './index.html',
@@ -29,19 +34,34 @@ self.addEventListener('activate', e => {
   );
 });
 
-/* Cache-first com atualização em segundo plano. Tiles do mapa ficam em cache após a 1ª visita. */
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const network = fetch(e.request).then(resp => {
+  const sameOrigin = new URL(e.request.url).origin === self.location.origin;
+
+  if (sameOrigin) {
+    // REDE PRIMEIRO p/ arquivos do app
+    e.respondWith(
+      fetch(e.request).then(resp => {
         if (resp && resp.status === 200) {
           const copy = resp.clone();
           caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
         }
         return resp;
-      }).catch(() => cached);
-      return cached || network;
-    })
-  );
+      }).catch(() => caches.match(e.request))
+    );
+  } else {
+    // CACHE PRIMEIRO p/ tiles e libs externas
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        const network = fetch(e.request).then(resp => {
+          if (resp && resp.status === 200) {
+            const copy = resp.clone();
+            caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+          }
+          return resp;
+        }).catch(() => cached);
+        return cached || network;
+      })
+    );
+  }
 });
