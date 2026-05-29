@@ -5,6 +5,8 @@
 (function () {
 'use strict';
 
+const APP_VERSION = 'v13';
+
 /* ---------- Storage helpers ---------- */
 const LS = {
   get(k, def) { try { const v = localStorage.getItem('agronav_' + k); return v ? JSON.parse(v) : def; } catch { return def; } },
@@ -777,6 +779,7 @@ function loadCfgUI() {
   $('#routeGS').value = state.cfg.tas;
   $('#routeFF').value = state.cfg.ff;
   $('#routeVar').value = state.cfg.var;
+  const vl = $('#appVersionLine'); if (vl) vl.textContent = 'Versão ' + APP_VERSION;
 }
 function saveCfg() {
   state.cfg = {
@@ -788,6 +791,22 @@ function saveCfg() {
   loadCfgUI(); drawFieldsOnMap(); renderFields();
   toast('Configurações salvas');
 }
+async function forceUpdate() {
+  toast('Buscando versão nova…');
+  try {
+    if ('serviceWorker' in navigator) {
+      const rs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(rs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const ks = await caches.keys();
+      await Promise.all(ks.map(k => caches.delete(k)));
+    }
+  } catch (e) { /* segue mesmo assim */ }
+  // recarrega forçando ignorar cache
+  location.replace(location.pathname + '?u=' + Date.now());
+}
+
 function exportAll() {
   const data = { _app:'AgroNav', _ver:1, cfg:state.cfg, route:state.route, savedRoutes:state.savedRoutes, fields:state.fields };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
@@ -877,6 +896,7 @@ function wire() {
 
   // Settings
   $('#btnSaveCfg').addEventListener('click', saveCfg);
+  $('#btnForceUpdate').addEventListener('click', forceUpdate);
   $('#btnExport').addEventListener('click', exportAll);
   $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importAll(e.target.files[0]); });
   $('#btnWipe').addEventListener('click', () => {

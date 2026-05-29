@@ -280,11 +280,13 @@
                 <div class="card">
                     <div class="card-head"><h3>Dados</h3></div>
                     <div class="card-actions wrap">
+                        <button class="btn btn-primary" id="btnForceUpdate"><i class="fas fa-rotate"></i> Forçar atualização</button>
                         <button class="btn btn-ghost" id="btnExport"><i class="fas fa-download"></i> Exportar tudo (JSON)</button>
                         <label class="btn btn-ghost" for="importFile"><i class="fas fa-upload"></i> Importar JSON</label>
                         <input type="file" id="importFile" accept="application/json" hidden>
                         <button class="btn btn-ghost danger" id="btnWipe"><i class="fas fa-trash-can"></i> Apagar tudo</button>
                     </div>
+                    <p class="hint" id="appVersionLine">Versão —</p>
                 </div>
                 <div class="card">
                     <div class="card-head"><h3>Sobre</h3></div>
@@ -324,9 +326,15 @@
           location.reload();
         });
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js').then(reg => {
-            reg.update().catch(() => {}); // checa atualização sempre que abre
+          // updateViaCache:'none' => o próprio sw.js nunca vem do cache HTTP (detecta nova versão na hora)
+          navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+            reg.update().catch(() => {});
+            setInterval(() => reg.update().catch(() => {}), 60000);
           }).catch(() => {});
+        });
+        // ao voltar pro app, checa atualização
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) navigator.serviceWorker.ready.then(r => r.update()).catch(() => {});
         });
       }
     </script>

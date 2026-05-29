@@ -4,7 +4,7 @@
      quando há internet; cai pro cache só offline. (evita ficar preso em versão velha)
    - Recursos externos (tiles do mapa, Leaflet, FontAwesome): CACHE PRIMEIRO → rápido e
      funciona offline depois da 1ª visita. */
-const CACHE = 'agronav-v12';
+const CACHE = 'agronav-v13';
 const SHELL = [
   './',
   './index.html',
@@ -40,9 +40,10 @@ self.addEventListener('fetch', e => {
   const sameOrigin = new URL(e.request.url).origin === self.location.origin;
 
   if (sameOrigin) {
-    // REDE PRIMEIRO p/ arquivos do app
+    // REDE PRIMEIRO p/ arquivos do app — cache:'reload' ignora o cache HTTP do navegador
+    // (assim pega SEMPRE a versão mais nova do servidor); cai pro cache só offline.
     e.respondWith(
-      fetch(e.request).then(resp => {
+      fetch(new Request(e.request.url, { cache: 'reload' })).then(resp => {
         if (resp && resp.status === 200) {
           const copy = resp.clone();
           caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
