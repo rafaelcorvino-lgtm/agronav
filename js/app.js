@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v23';
+const APP_VERSION = 'v24';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -16,7 +16,7 @@ const LS = {
 
 /* ---------- App state ---------- */
 const state = {
-  cfg: LS.get('cfg', { tail:'', model:'', tas:110, ff:120, var:-21, area:'ha' }),
+  cfg: LS.get('cfg', { tail:'', model:'', tas:110, ff:120, var:-21, area:'ha', speedU:'kt', distU:'nm', altU:'ft', fuelU:'l' }),
   route: LS.get('route', []),          // [{name, lat, lon}]
   savedRoutes: LS.get('savedRoutes', []),
   fields: LS.get('fields', []),        // [{id, name, coords:[[lat,lon]...], area}]
@@ -63,6 +63,20 @@ function fmtHM(hours) {
   return (h > 0 ? h + 'h' : '') + String(m).padStart(h>0?2:1, '0') + 'min';
 }
 function fmtDeg(d) { return String(Math.round(d)).padStart(3, '0'); }
+
+/* ---------- Unidades (conversão a partir da base: kt / NM / ft / L) ---------- */
+const SPEED_F = { kt:1, kmh:1.852, mph:1.15078 }, SPEED_L = { kt:'kt', kmh:'km/h', mph:'mph' };
+const DIST_F  = { nm:1, km:1.852, mi:1.15078 },  DIST_L  = { nm:'NM', km:'km', mi:'mi' };
+const ALT_F   = { ft:1, m:0.3048 },              ALT_L   = { ft:'ft', m:'m' };
+const FUEL_F  = { l:1, gal:0.264172 },           FUEL_L  = { l:'L', gal:'gal' };
+const uSpeed = () => SPEED_L[state.cfg.speedU] || 'kt';
+const cSpeed = kt => (kt == null ? null : kt * (SPEED_F[state.cfg.speedU] || 1));
+const uDist  = () => DIST_L[state.cfg.distU] || 'NM';
+const cDist  = nm => nm * (DIST_F[state.cfg.distU] || 1);
+const uAlt   = () => ALT_L[state.cfg.altU] || 'ft';
+const cAlt   = ft => (ft == null ? null : ft * (ALT_F[state.cfg.altU] || 1));
+const uFuel  = () => FUEL_L[state.cfg.fuelU] || 'L';
+const cFuel  = l => l * (FUEL_F[state.cfg.fuelU] || 1);
 
 /* ---------- DOM helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -459,9 +473,9 @@ function onPos(p) {
   const trk = c.heading != null && !isNaN(c.heading) ? c.heading : null;
   const altFt = c.altitude != null ? c.altitude * 3.28084 : null;
 
-  $('#hud-gs').textContent  = gsKt != null ? Math.round(gsKt) : '--';
+  $('#hud-gs').textContent  = gsKt != null ? Math.round(cSpeed(gsKt)) : '--';
   $('#hud-trk').textContent = trk != null ? fmtDeg(trk) : '--';
-  $('#hud-alt').textContent = altFt != null ? Math.round(altFt) : '--';
+  $('#hud-alt').textContent = altFt != null ? Math.round(cAlt(altFt)) : '--';
   $('#hud-lat').textContent = c.latitude.toFixed(4);
   $('#hud-lon').textContent = c.longitude.toFixed(4);
 
@@ -538,9 +552,9 @@ function updateNavBanner() {
   banner.classList.remove('hidden');
   $('#nav-to-name').textContent = target.name;
   // GS e AGL (estado atual da aeronave)
-  $('#nav-gs').textContent = (state.lastGsKt != null) ? Math.round(state.lastGsKt) : '--';
+  $('#nav-gs').textContent = (state.lastGsKt != null) ? Math.round(cSpeed(state.lastGsKt)) : '--';
   const agl = aglFt();
-  $('#nav-agl').textContent = (agl != null) ? Math.round(agl) : '--';
+  $('#nav-agl').textContent = (agl != null) ? Math.round(cAlt(agl)) : '--';
   if (!state.pos) {                 // sem GPS: mostra destino, pede GPS
     $('#nav-dist').textContent = '--';
     $('#nav-brg').textContent = '--';
@@ -551,7 +565,7 @@ function updateNavBanner() {
   }
   const dist = haversineNM(state.pos, target);
   const brg = toMag(bearingTrue(state.pos, target));
-  $('#nav-dist').textContent = dist.toFixed(1);
+  $('#nav-dist').textContent = cDist(dist).toFixed(1);
   $('#nav-brg').textContent = fmtDeg(brg);
   // ETE e ETA pela velocidade do solo real (GS) — cai p/ TAS de cruzeiro se parado
   const gs = (state.lastGsKt && state.lastGsKt > 5) ? state.lastGsKt : (Number(state.cfg.tas) || 110);
@@ -624,14 +638,14 @@ function renderRoute() {
     if (i > 0) { totTime += t; totFuel += fuel; }
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${i+1}</td><td>${w.name}</td><td>${brgM}${i>0?'°':''}</td>`
-      + `<td>${i>0?dist.toFixed(1):'—'}</td><td>${i>0?fmtHM(t):'—'}</td>`
-      + `<td>${i>0?fuel.toFixed(0):'—'}</td>`
+      + `<td>${i>0?cDist(dist).toFixed(1):'—'}</td><td>${i>0?fmtHM(t):'—'}</td>`
+      + `<td>${i>0?cFuel(fuel).toFixed(0):'—'}</td>`
       + `<td><button class="row-btn" data-rm="${i}"><i class="fas fa-xmark"></i></button></td>`;
     tb.appendChild(tr);
   });
-  $('#rt-total-dist').textContent = totDist.toFixed(1);
+  $('#rt-total-dist').textContent = cDist(totDist).toFixed(1);
   $('#rt-total-ete').textContent = fmtHM(totTime);
-  $('#rt-total-fuel').textContent = totFuel.toFixed(0);
+  $('#rt-total-fuel').textContent = cFuel(totFuel).toFixed(0);
 
   tb.querySelectorAll('[data-rm]').forEach(b =>
     b.addEventListener('click', () => removeWaypoint(+b.dataset.rm)));
@@ -954,6 +968,10 @@ function loadCfgUI() {
   $('#cfg-ff').value = state.cfg.ff;
   $('#cfg-var').value = state.cfg.var;
   $('#cfg-area').value = state.cfg.area;
+  $('#cfg-speedU').value = state.cfg.speedU || 'kt';
+  $('#cfg-distU').value = state.cfg.distU || 'nm';
+  $('#cfg-altU').value = state.cfg.altU || 'ft';
+  $('#cfg-fuelU').value = state.cfg.fuelU || 'l';
   $('#routeGS').value = state.cfg.tas;
   $('#routeFF').value = state.cfg.ff;
   $('#routeVar').value = state.cfg.var;
@@ -963,11 +981,23 @@ function saveCfg() {
   state.cfg = {
     tail:$('#cfg-tail').value.trim(), model:$('#cfg-model').value.trim(),
     tas:+$('#cfg-tas').value || 110, ff:+$('#cfg-ff').value || 120,
-    var:+$('#cfg-var').value || 0, area:$('#cfg-area').value
+    var:+$('#cfg-var').value || 0, area:$('#cfg-area').value,
+    speedU:$('#cfg-speedU').value, distU:$('#cfg-distU').value,
+    altU:$('#cfg-altU').value, fuelU:$('#cfg-fuelU').value
   };
   LS.set('cfg', state.cfg);
-  loadCfgUI(); drawFieldsOnMap(); renderFields();
+  loadCfgUI(); applyUnits(); drawFieldsOnMap(); renderFields();
   toast('Configurações salvas');
+}
+
+// atualiza os rótulos de unidade em todo o app
+function applyUnits() {
+  const set = (id, txt) => { const e = $('#' + id); if (e) e.textContent = txt; };
+  set('u-gs', uSpeed()); set('u-alt', uAlt());
+  set('u-nav-gs', uSpeed()); set('u-nav-agl', uAlt()); set('u-nav-dist', uDist());
+  set('th-dist', 'Dist (' + uDist() + ')'); set('th-fuel', 'Comb (' + uFuel() + ')');
+  renderRoute();
+  updateNavBanner();
 }
 async function forceUpdate() {
   toast('Buscando versão nova…');
@@ -1076,6 +1106,7 @@ function wire() {
 
   // Settings
   $('#btnSaveCfg').addEventListener('click', saveCfg);
+  $('#btnSaveUnits').addEventListener('click', saveCfg);
   $('#btnForceUpdate').addEventListener('click', forceUpdate);
   $('#btnExport').addEventListener('click', exportAll);
   $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importAll(e.target.files[0]); });
@@ -1125,6 +1156,7 @@ function init() {
   wire();
   wireIcaoLookup();
   loadCfgUI();
+  applyUnits();
   renderRoute();
   renderFields();
   loadAirportsOnline();

@@ -50,9 +50,9 @@
 
             <!-- HUD: live flight data -->
             <div class="hud" id="hud">
-                <div class="hud-item"><span class="hud-label">GS</span><span class="hud-val" id="hud-gs">--</span><span class="hud-unit">kt</span></div>
+                <div class="hud-item"><span class="hud-label">GS</span><span class="hud-val" id="hud-gs">--</span><span class="hud-unit" id="u-gs">kt</span></div>
                 <div class="hud-item"><span class="hud-label">TRK</span><span class="hud-val" id="hud-trk">--</span><span class="hud-unit">°</span></div>
-                <div class="hud-item"><span class="hud-label">ALT</span><span class="hud-val" id="hud-alt">--</span><span class="hud-unit">ft</span></div>
+                <div class="hud-item"><span class="hud-label">ALT</span><span class="hud-val" id="hud-alt">--</span><span class="hud-unit" id="u-alt">ft</span></div>
                 <div class="hud-item"><span class="hud-label">LAT</span><span class="hud-val sm" id="hud-lat">--</span></div>
                 <div class="hud-item"><span class="hud-label">LON</span><span class="hud-val sm" id="hud-lon">--</span></div>
             </div>
@@ -91,9 +91,9 @@
                     <span id="nav-to-name">—</span>
                 </div>
                 <div class="nav-banner-data">
-                    <div><span class="nb-label">GS</span><span id="nav-gs">--</span> kt</div>
-                    <div><span class="nb-label">AGL</span><span id="nav-agl">--</span> ft</div>
-                    <div><span class="nb-label">DIST</span><span id="nav-dist">--</span> NM</div>
+                    <div><span class="nb-label">GS</span><span id="nav-gs">--</span> <span id="u-nav-gs">kt</span></div>
+                    <div><span class="nb-label">AGL</span><span id="nav-agl">--</span> <span id="u-nav-agl">ft</span></div>
+                    <div><span class="nb-label">DIST</span><span id="nav-dist">--</span> <span id="u-nav-dist">NM</span></div>
                     <div><span class="nb-label">RUMO</span><span id="nav-brg">--</span>°</div>
                     <div><span class="nb-label">ETE</span><span id="nav-ete">--</span></div>
                     <div><span class="nb-label">ETA</span><span id="nav-eta">--</span></div>
@@ -131,7 +131,7 @@
                     </div>
                     <div class="table-wrap">
                         <table class="data-table" id="routeTable">
-                            <thead><tr><th>#</th><th>Ponto</th><th>Rumo M</th><th>Dist (NM)</th><th>ETE</th><th>Comb (L)</th><th></th></tr></thead>
+                            <thead><tr><th>#</th><th>Ponto</th><th>Rumo M</th><th id="th-dist">Dist (NM)</th><th>ETE</th><th id="th-fuel">Comb (L)</th><th></th></tr></thead>
                             <tbody></tbody>
                             <tfoot><tr><td colspan="3">TOTAL</td><td id="rt-total-dist">0</td><td id="rt-total-ete">0</td><td id="rt-total-fuel">0</td><td></td></tr></tfoot>
                         </table>
@@ -279,11 +279,29 @@
                         <div class="field"><label>TAS cruzeiro (kt)</label><input type="number" id="cfg-tas" value="110"></div>
                         <div class="field"><label>Consumo (L/h)</label><input type="number" id="cfg-ff" value="120"></div>
                         <div class="field"><label>Decl. magnética (°)</label><input type="number" id="cfg-var" value="-21"></div>
-                        <div class="field"><label>Unidade de área</label>
+                    </div>
+                    <button class="btn btn-primary" id="btnSaveCfg"><i class="fas fa-floppy-disk"></i> Salvar</button>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3><i class="fas fa-ruler"></i> Unidades</h3></div>
+                    <div class="grid-2">
+                        <div class="field"><label>Velocidade</label>
+                            <select id="cfg-speedU"><option value="kt">Nós (kt)</option><option value="kmh">km/h</option><option value="mph">mph</option></select>
+                        </div>
+                        <div class="field"><label>Distância</label>
+                            <select id="cfg-distU"><option value="nm">Milhas náuticas (NM)</option><option value="km">Quilômetros (km)</option><option value="mi">Milhas (mi)</option></select>
+                        </div>
+                        <div class="field"><label>Altitude / altura</label>
+                            <select id="cfg-altU"><option value="ft">Pés (ft)</option><option value="m">Metros (m)</option></select>
+                        </div>
+                        <div class="field"><label>Combustível</label>
+                            <select id="cfg-fuelU"><option value="l">Litros (L)</option><option value="gal">Galões (gal)</option></select>
+                        </div>
+                        <div class="field"><label>Área (talhões)</label>
                             <select id="cfg-area"><option value="ha">Hectares (ha)</option><option value="ac">Acres</option><option value="km2">km²</option></select>
                         </div>
                     </div>
-                    <button class="btn btn-primary" id="btnSaveCfg"><i class="fas fa-floppy-disk"></i> Salvar</button>
+                    <button class="btn btn-primary" id="btnSaveUnits"><i class="fas fa-floppy-disk"></i> Salvar unidades</button>
                 </div>
                 <div class="card">
                     <div class="card-head"><h3>Dados</h3></div>
