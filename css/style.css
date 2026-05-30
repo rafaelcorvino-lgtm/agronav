@@ -71,7 +71,7 @@ body {
 #map { position:fixed; top:0; left:var(--sidebar-width); right:0; bottom:0; background:#0a1119; }
 .leaflet-container { background:#0a1119; font-family:inherit; }
 
-.hud { position:fixed; top:14px; left:calc(var(--sidebar-width) + 14px); z-index:500; display:flex; gap:8px; background:rgba(15,25,35,.82); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:var(--radius); padding:10px 12px; box-shadow:var(--shadow); }
+.hud { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:calc(var(--sidebar-width) + 14px + env(safe-area-inset-left)); z-index:500; display:flex; gap:8px; background:rgba(15,25,35,.82); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:var(--radius); padding:10px 12px; box-shadow:var(--shadow); max-width:calc(100vw - 90px); overflow:hidden; }
 .hud-item { display:flex; flex-direction:column; align-items:center; min-width:52px; }
 .hud-label { font-size:10px; color:var(--text-muted); font-weight:600; letter-spacing:1px; }
 .hud-val { font-size:22px; font-weight:700; color:var(--accent-cyan); font-variant-numeric:tabular-nums; line-height:1.1; }
@@ -92,11 +92,12 @@ body {
 .apt-legend .leg-row { min-height:17px; }
 .apt-legend .leg-strip { height:5px; border-radius:2px; background:var(--text-secondary); border:1px solid #0b1219; flex:none; box-sizing:border-box; }
 
-.gps-info { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:500; background:rgba(15,25,35,.85); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:20px; padding:5px 12px; font-size:12px; font-weight:600; color:var(--text-secondary); box-shadow:var(--shadow); white-space:nowrap; }
+.gps-info { position:fixed; top:calc(76px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:501; background:rgba(15,25,35,.9); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:20px; padding:5px 12px; font-size:12px; font-weight:600; color:var(--text-secondary); box-shadow:var(--shadow); white-space:nowrap; max-width:calc(100vw - 24px); overflow:hidden; text-overflow:ellipsis; }
 .gps-info.warn { border-color:var(--accent-orange); color:var(--accent-orange); }
 .gps-info.ok { border-color:var(--accent-green); }
 
-.map-controls { position:fixed; top:14px; right:14px; z-index:500; display:flex; flex-direction:column; gap:8px; }
+.map-controls { position:fixed; top:calc(14px + env(safe-area-inset-top)); right:calc(14px + env(safe-area-inset-right)); z-index:500; display:flex; flex-direction:column; gap:8px; max-height:calc(100dvh - 28px); flex-wrap:wrap; align-content:flex-end; pointer-events:none; }
+.map-controls .map-btn { pointer-events:auto; }
 .map-btn { width:44px; height:44px; border-radius:var(--radius); border:1px solid var(--border-color); background:rgba(15,25,35,.88); color:var(--text-primary); font-size:17px; cursor:pointer; box-shadow:var(--shadow); transition:all .15s; }
 .map-btn:hover { background:var(--bg-card); }
 .map-btn.active { background:var(--accent-cyan); color:#04161c; border-color:var(--accent-cyan); }
@@ -235,8 +236,8 @@ body {
     .sidebar.open { transform:translateX(0); }
     .main { margin-left:0; }
     #map { left:0; }
-    .hud { left:62px; top:12px; padding:8px; gap:5px; }
-    .hud-item { min-width:42px; }
+    .hud { left:calc(62px + env(safe-area-inset-left)); top:calc(12px + env(safe-area-inset-top)); padding:8px; gap:5px; }
+    .hud-item { min-width:40px; }
     .hud-val { font-size:17px; }
     .apt-legend { left:10px; bottom:10px; padding:6px 10px; font-size:11px; }
     .leg-restore { left:10px; bottom:10px; }
@@ -249,4 +250,14 @@ body {
     .data-table th, .data-table td { padding:8px 6px; font-size:12px; }
     .data-table th { font-size:10px; letter-spacing:0; }
     .table-wrap { -webkit-overflow-scrolling:touch; }
+}
+
+/* ===== PAISAGEM (tela baixa): botões menores, painel sem cobrir controles ===== */
+@media (orientation:landscape) and (max-height:520px) {
+    .map-btn { width:38px; height:38px; font-size:15px; }
+    .map-controls { gap:5px; top:calc(6px + env(safe-area-inset-top)); right:calc(8px + env(safe-area-inset-right)); max-height:calc(100dvh - 12px); }
+    .hud { top:calc(8px + env(safe-area-inset-top)); padding:6px 8px; }
+    .gps-info { top:calc(8px + env(safe-area-inset-top)); }
+    .nav-banner { left:10px; right:calc(60px + env(safe-area-inset-right)); bottom:8px; transform:none; min-width:0; }
+    .apt-legend, .leg-restore { bottom:8px; }
 }

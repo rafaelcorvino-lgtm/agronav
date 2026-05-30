@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v22';
+const APP_VERSION = 'v23';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -1098,7 +1098,7 @@ function addDrawButton() {
   const aptBtn = document.createElement('button');
   aptBtn.className = 'map-btn' + (state.showAirports ? ' active' : '');
   aptBtn.id = 'btnAirports'; aptBtn.title = 'Mostrar/ocultar aeródromos';
-  aptBtn.innerHTML = '<i class="fas fa-tower-control"></i>';
+  aptBtn.innerHTML = '<i class="fas fa-plane-up"></i>';
   aptBtn.addEventListener('click', () => {
     state.showAirports = !state.showAirports;
     aptBtn.classList.toggle('active', state.showAirports);
