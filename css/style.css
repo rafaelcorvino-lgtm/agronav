@@ -92,6 +92,10 @@ body {
 .apt-legend .leg-row { min-height:17px; }
 .apt-legend .leg-strip { height:5px; border-radius:2px; background:var(--text-secondary); border:1px solid #0b1219; flex:none; box-sizing:border-box; }
 
+.gps-info { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:500; background:rgba(15,25,35,.85); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:20px; padding:5px 12px; font-size:12px; font-weight:600; color:var(--text-secondary); box-shadow:var(--shadow); white-space:nowrap; }
+.gps-info.warn { border-color:var(--accent-orange); color:var(--accent-orange); }
+.gps-info.ok { border-color:var(--accent-green); }
+
 .map-controls { position:fixed; top:14px; right:14px; z-index:500; display:flex; flex-direction:column; gap:8px; }
 .map-btn { width:44px; height:44px; border-radius:var(--radius); border:1px solid var(--border-color); background:rgba(15,25,35,.88); color:var(--text-primary); font-size:17px; cursor:pointer; box-shadow:var(--shadow); transition:all .15s; }
 .map-btn:hover { background:var(--bg-card); }

@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v18';
+const APP_VERSION = 'v19';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -363,29 +363,67 @@ function setGpsBadge(cls, txt) {
   b.innerHTML = '<i class="fas fa-circle"></i> ' + txt;
 }
 
+let gpsAgeTimer = null, wakeLock = null;
+
+async function requestWakeLock() {
+  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+function releaseWakeLock() { try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {} }
+// re-adquire o wake lock ao voltar pro app (o SO solta quando vai p/ segundo plano)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.watchId !== null && !wakeLock) requestWakeLock();
+});
+
 function toggleGPS() {
   if (state.watchId !== null) { stopGPS(); return; }
   if (!('geolocation' in navigator)) { toast('GPS não suportado neste dispositivo', true); return; }
+  if (!window.isSecureContext) { toast('GPS exige HTTPS (use o link https://, não funciona offline/arquivo)', true); }
   setGpsBadge('gps-on', 'buscando...');
+  const info = $('#gpsInfo');
+  if (info) { info.className = 'gps-info'; info.textContent = 'GPS: buscando sinal…'; }
+  state.gpsFixes = 0; state.lastFixTime = 0;
+  requestWakeLock();
+  // posição imediata p/ aparecer rápido
+  navigator.geolocation.getCurrentPosition(onPos, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+  // monitoramento contínuo (sempre posição nova: maximumAge 0)
   state.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
-    enableHighAccuracy:true, maximumAge:1000, timeout:15000
+    enableHighAccuracy: true, maximumAge: 0, timeout: 25000
   });
   $('#btnLocate').classList.add('active');
+  if (!gpsAgeTimer) gpsAgeTimer = setInterval(updateGpsAge, 2000);
 }
 function stopGPS() {
   if (state.watchId !== null) navigator.geolocation.clearWatch(state.watchId);
   state.watchId = null;
   $('#btnLocate').classList.remove('active');
   setGpsBadge('gps-off', 'GPS off');
+  const info = $('#gpsInfo'); if (info) info.classList.add('hidden');
+  releaseWakeLock();
+  if (gpsAgeTimer) { clearInterval(gpsAgeTimer); gpsAgeTimer = null; }
 }
 function onPosErr(err) {
   setGpsBadge('gps-err', 'erro GPS');
+  const info = $('#gpsInfo');
+  if (info) { info.className = 'gps-info warn'; info.textContent = 'Erro GPS: ' + err.message; }
   toast('Erro de GPS: ' + err.message, true);
+}
+function updateGpsAge() {
+  const el = $('#gpsInfo');
+  if (!el || state.watchId === null || !state.lastFixTime) return;
+  const age = Math.round((Date.now() - state.lastFixTime) / 1000);
+  const acc = state.lastAcc != null ? '±' + Math.round(state.lastAcc) + 'm' : '';
+  if (age > 6) { el.className = 'gps-info warn'; el.textContent = `GPS ${acc} · parado há ${age}s (tela ligada?)`; }
+  else { el.className = 'gps-info ok'; el.textContent = `GPS ${acc} · ${state.gpsFixes} fix · ${age}s`; }
 }
 function onPos(p) {
   const c = p.coords;
   state.pos = { lat:c.latitude, lon:c.longitude };
   setGpsBadge('gps-on', 'ativo');
+  state.gpsFixes = (state.gpsFixes || 0) + 1;
+  state.lastFixTime = Date.now();
+  state.lastAcc = c.accuracy;
+  const gi = $('#gpsInfo');
+  if (gi) { gi.classList.remove('hidden'); gi.className = 'gps-info ok'; gi.textContent = `GPS ±${Math.round(c.accuracy || 0)}m · ${state.gpsFixes} fix · agora`; }
 
   const gsKt = c.speed != null ? c.speed * 1.94384 : null;       // m/s → kt
   state.lastGsKt = gsKt;
