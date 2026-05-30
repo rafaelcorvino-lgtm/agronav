@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v20';
+const APP_VERSION = 'v21';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -374,21 +374,29 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && state.watchId !== null && !wakeLock) requestWakeLock();
 });
 
+let lowAccTried = false;
+function gpsInfoMsg(cls, txt) {
+  const info = $('#gpsInfo');
+  if (info) { info.classList.remove('hidden'); info.className = 'gps-info' + (cls ? ' ' + cls : ''); info.textContent = txt; }
+}
 function toggleGPS() {
   if (state.watchId !== null) { stopGPS(); return; }
   if (!('geolocation' in navigator)) { toast('GPS não suportado neste dispositivo', true); return; }
-  if (!window.isSecureContext) { toast('GPS exige HTTPS (use o link https://, não funciona offline/arquivo)', true); }
+  if (!window.isSecureContext) { toast('GPS exige HTTPS (abra pelo link https://)', true); }
   setGpsBadge('gps-on', 'buscando...');
-  const info = $('#gpsInfo');
-  if (info) { info.className = 'gps-info'; info.textContent = 'GPS: buscando sinal…'; }
-  state.gpsFixes = 0; state.lastFixTime = 0;
+  gpsInfoMsg('', 'GPS: permita a localização quando o navegador pedir…');
+  state.gpsFixes = 0; state.lastFixTime = 0; state.gpsHigh = true; lowAccTried = false;
   requestWakeLock();
-  // posição imediata p/ aparecer rápido
-  navigator.geolocation.getCurrentPosition(onPos, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
-  // monitoramento contínuo (sempre posição nova: maximumAge 0)
-  state.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
-    enableHighAccuracy: true, maximumAge: 0, timeout: 25000
-  });
+  // aviso proativo se a permissão já estiver bloqueada
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'geolocation' }).then(p => {
+      if (p.state === 'denied') gpsInfoMsg('warn', 'GPS bloqueado — libere a localização nas configurações do navegador');
+    }).catch(() => {});
+  }
+  // 1) fix rápido por rede (baixa precisão) — aparece já, mesmo em local fechado
+  navigator.geolocation.getCurrentPosition(onPos, () => {}, { enableHighAccuracy: false, maximumAge: 30000, timeout: 8000 });
+  // 2) monitoramento de alta precisão
+  state.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 27000 });
   $('#btnLocate').classList.add('active');
   if (!gpsAgeTimer) gpsAgeTimer = setInterval(updateGpsAge, 2000);
 }
@@ -402,10 +410,17 @@ function stopGPS() {
   if (gpsAgeTimer) { clearInterval(gpsAgeTimer); gpsAgeTimer = null; }
 }
 function onPosErr(err) {
-  setGpsBadge('gps-err', 'erro GPS');
-  const info = $('#gpsInfo');
-  if (info) { info.className = 'gps-info warn'; info.textContent = 'Erro GPS: ' + err.message; }
-  toast('Erro de GPS: ' + err.message, true);
+  let msg;
+  if (err.code === 1) { msg = 'Permissão negada — libere a localização do site/navegador'; setGpsBadge('gps-err', 'bloqueado'); }
+  else if (err.code === 2) { msg = 'Posição indisponível — ligue a Localização do aparelho (Alta precisão)'; setGpsBadge('gps-on', 'buscando...'); }
+  else { msg = 'Buscando sinal… a céu aberto pega mais rápido'; setGpsBadge('gps-on', 'buscando...'); }
+  gpsInfoMsg('warn', 'GPS: ' + msg);
+  // fallback: se nada chegou ainda e não foi negado, troca p/ baixa precisão (rede)
+  if (!state.gpsFixes && err.code !== 1 && !lowAccTried && state.watchId !== null) {
+    lowAccTried = true; state.gpsHigh = false;
+    try { navigator.geolocation.clearWatch(state.watchId); } catch (e) {}
+    state.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: false, maximumAge: 15000, timeout: 25000 });
+  }
 }
 let lastWatchRestart = 0;
 function restartWatch() {                 // vigia: reinicia o watch se ele "morrer"
@@ -413,9 +428,10 @@ function restartWatch() {                 // vigia: reinicia o watch se ele "mor
   const now = Date.now();
   if (now - lastWatchRestart < 8000) return;
   lastWatchRestart = now;
+  const hi = state.gpsHigh !== false;
   try { navigator.geolocation.clearWatch(state.watchId); } catch (e) {}
-  navigator.geolocation.getCurrentPosition(onPos, () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
-  state.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 });
+  navigator.geolocation.getCurrentPosition(onPos, () => {}, { enableHighAccuracy: hi, maximumAge: 0, timeout: 15000 });
+  state.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: hi, maximumAge: 0, timeout: 25000 });
 }
 function updateGpsAge() {
   const el = $('#gpsInfo');
