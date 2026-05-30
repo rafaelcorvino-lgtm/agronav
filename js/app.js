@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v24';
+const APP_VERSION = 'v25';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -476,8 +476,6 @@ function onPos(p) {
   $('#hud-gs').textContent  = gsKt != null ? Math.round(cSpeed(gsKt)) : '--';
   $('#hud-trk').textContent = trk != null ? fmtDeg(trk) : '--';
   $('#hud-alt').textContent = altFt != null ? Math.round(cAlt(altFt)) : '--';
-  $('#hud-lat').textContent = c.latitude.toFixed(4);
-  $('#hud-lon').textContent = c.longitude.toFixed(4);
 
   const ll = [c.latitude, c.longitude];
   if (!posMarker) {
