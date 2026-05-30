@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v19';
+const APP_VERSION = 'v20';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -407,12 +407,23 @@ function onPosErr(err) {
   if (info) { info.className = 'gps-info warn'; info.textContent = 'Erro GPS: ' + err.message; }
   toast('Erro de GPS: ' + err.message, true);
 }
+let lastWatchRestart = 0;
+function restartWatch() {                 // vigia: reinicia o watch se ele "morrer"
+  if (state.watchId === null) return;
+  const now = Date.now();
+  if (now - lastWatchRestart < 8000) return;
+  lastWatchRestart = now;
+  try { navigator.geolocation.clearWatch(state.watchId); } catch (e) {}
+  navigator.geolocation.getCurrentPosition(onPos, () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  state.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 });
+}
 function updateGpsAge() {
   const el = $('#gpsInfo');
   if (!el || state.watchId === null || !state.lastFixTime) return;
   const age = Math.round((Date.now() - state.lastFixTime) / 1000);
   const acc = state.lastAcc != null ? '±' + Math.round(state.lastAcc) + 'm' : '';
-  if (age > 6) { el.className = 'gps-info warn'; el.textContent = `GPS ${acc} · parado há ${age}s (tela ligada?)`; }
+  if (age > 10) restartWatch();           // travou: tenta reiniciar o GPS sozinho
+  if (age > 6) { el.className = 'gps-info warn'; el.textContent = `GPS ${acc} · reativando… (${age}s)`; }
   else { el.className = 'gps-info ok'; el.textContent = `GPS ${acc} · ${state.gpsFixes} fix · ${age}s`; }
 }
 function onPos(p) {
