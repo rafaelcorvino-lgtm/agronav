@@ -124,10 +124,16 @@ body {
 #hsiSvg .hsi-cardltr { fill:var(--accent-cyan); font-size:13px; font-weight:800; text-anchor:middle; }
 #hsiSvg .hsi-lubber { fill:var(--accent-orange); }
 #hsiSvg .hsi-plane line { stroke:#ffd23f; stroke-width:3; stroke-linecap:round; }
-#hsiSvg .hsi-crs-line { stroke:var(--accent-cyan); stroke-width:3; }
-#hsiSvg .hsi-crs-head { fill:var(--accent-cyan); }
-#hsiSvg .hsi-cdi { stroke:var(--accent-green); stroke-width:3.5; }
+#hsiSvg .hsi-crs-line { stroke:#e24adf; stroke-width:3.2; }
+#hsiSvg .hsi-crs-head { fill:#e24adf; }
+#hsiSvg .hsi-cdi { stroke:#e24adf; stroke-width:3.6; }
 #hsiSvg .hsi-dot { fill:none; stroke:#8a9bb0; stroke-width:1.2; }
+#hsiSvg .hsi-brg-line { stroke:#22d3ee; stroke-width:1.8; }
+#hsiSvg .hsi-brg-head { fill:none; stroke:#22d3ee; stroke-width:1.8; }
+#hsiSvg .hsi-brg-tail { fill:none; stroke:#22d3ee; stroke-width:1.8; }
+#hsiSvg .hsi-toflag { fill:#ffffff; }
+#hsiSvg .hsi-src { fill:#e24adf; font-size:11px; font-weight:800; font-family:'Segoe UI',sans-serif; }
+#hsiSvg .hsi-srclbl { fill:#22d3ee; font-size:9px; font-weight:700; font-family:'Segoe UI',sans-serif; }
 
 /* navegando: retrato mostra HSI; paisagem mostra o painel */
 @media (orientation:portrait) { body.nav-on #hsi { display:flex; } }

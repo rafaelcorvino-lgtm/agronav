@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v26';
+const APP_VERSION = 'v27';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -588,6 +588,11 @@ function updateHSI(d) {
   const card = $('#hsi-card'); if (!card) return;
   $('#hsi-card').setAttribute('transform', `rotate(${(-d.trkMag).toFixed(1)} 100 100)`);
   $('#hsi-course').setAttribute('transform', `rotate(${(d.courseMag - d.trkMag).toFixed(1)} 100 100)`);
+  // ponteiro de marcação (bearing direto ao waypoint)
+  if (d.brgMag != null) $('#hsi-brg').setAttribute('transform', `rotate(${(d.brgMag - d.trkMag).toFixed(1)} 100 100)`);
+  // bandeira TO/FROM (FROM se já passou o waypoint)
+  const delta = ((d.brgMag - d.courseMag + 540) % 360) - 180;
+  $('#hsi-toflag').setAttribute('transform', Math.abs(delta) <= 90 ? '' : 'rotate(180 100 100)');
   const FULL = 2, MAXPX = 38;                              // escala cheia = 2 NM
   const defl = Math.max(-1, Math.min(1, (d.xtk || 0) / FULL)) * MAXPX;
   $('#hsi-cdi').setAttribute('transform', `translate(${(-defl).toFixed(1)} 0)`);  // dir do curso → barra à esq
@@ -642,7 +647,7 @@ function updateNavBanner() {
   $('#nav-eta').textContent = eta;
 
   // HSI (retrato)
-  updateHSI({ trkTrue, trkMag: toMag(trkTrue), courseTrue, courseMag: toMag(courseTrue), xtk, dist, agl, gsRaw, eteH, eta });
+  updateHSI({ trkTrue, trkMag: toMag(trkTrue), courseTrue, courseMag: toMag(courseTrue), brgMag, xtk, dist, agl, gsRaw, eteH, eta });
 
   if (state.gotoTarget) gotoLine.setLatLngs([[state.pos.lat, state.pos.lon], [target.lat, target.lon]]);
   if (!state.gotoTarget && dist < 0.5 && state.activeNavIdx < state.route.length - 1) { state.activeNavIdx++; state.navStart = null; }
