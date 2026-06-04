@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v28';
+const APP_VERSION = 'v29';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -351,111 +351,6 @@ function clearGoto() {
   updateNavBanner();
 }
 
-/* ===================================================================
-   PFD — Primary Flight Display (horizonte pelos sensores do celular)
-   =================================================================== */
-const pfd = { pitch: 0, roll: 0, asiPx: 1.7, altPx: 0.16, on: false };
-const ASI_CFG = { kt:{step:10,lbl:20,px:1.7,max:400}, kmh:{step:20,lbl:40,px:0.95,max:700}, mph:{step:20,lbl:40,px:1.0,max:600} };
-const ALT_CFG = { ft:{step:100,lbl:200,px:0.16,max:18000}, m:{step:50,lbl:100,px:0.5,max:6000} };
-const PFD_NS = 'http://www.w3.org/2000/svg';
-let pfdRawPitch = 0, pfdRawRoll = 0, pfdPitchRef = 0, pfdRollRef = 0, pfdOrientOn = false, pfdRaf = 0;
-
-function initPfd() {
-  const lad = $('#pfd-ladder');
-  if (lad && !lad.childNodes.length) {
-    [5,10,15,20].forEach(n => [-1,1].forEach(s => {
-      const y = 110 - s * n * 2.6, maj = n % 10 === 0, half = maj ? 22 : 11;
-      const ln = document.createElementNS(PFD_NS, 'line');
-      ln.setAttribute('x1', 150-half); ln.setAttribute('y1', y); ln.setAttribute('x2', 150+half); ln.setAttribute('y2', y);
-      lad.appendChild(ln);
-      if (maj) [[150-half-3,'end'],[150+half+3,'start']].forEach(([tx,an]) => {
-        const t = document.createElementNS(PFD_NS, 'text'); t.setAttribute('x', tx); t.setAttribute('y', y+3); t.setAttribute('text-anchor', an); t.textContent = n; lad.appendChild(t);
-      });
-    }));
-  }
-  const roll = $('#pfd-roll');
-  if (roll && !roll.childNodes.length) {
-    [0,10,20,30,45,60].forEach(a => [-1,1].forEach(s => {
-      if (a === 0 && s === -1) return;
-      const ang = (s*a) * Math.PI/180, R = 82, len = (a%30===0) ? 7 : 4;
-      const ln = document.createElementNS(PFD_NS, 'line');
-      ln.setAttribute('x1', (150+R*Math.sin(ang)).toFixed(1)); ln.setAttribute('y1', (110-R*Math.cos(ang)).toFixed(1));
-      ln.setAttribute('x2', (150+(R-len)*Math.sin(ang)).toFixed(1)); ln.setAttribute('y2', (110-(R-len)*Math.cos(ang)).toFixed(1));
-      roll.appendChild(ln);
-    }));
-  }
-  buildPfdTapes();
-}
-
-function buildPfdTapes() {
-  const asi = $('#pfd-asi'), alt = $('#pfd-alt'); if (!asi || !alt) return;
-  asi.innerHTML = ''; alt.innerHTML = '';
-  const ac = ASI_CFG[state.cfg.speedU] || ASI_CFG.kt; pfd.asiPx = ac.px;
-  for (let v = 0; v <= ac.max; v += ac.step) {
-    const y = -v * ac.px, maj = v % ac.lbl === 0;
-    const ln = document.createElementNS(PFD_NS, 'line'); ln.setAttribute('class', 'pfd-asi-tick');
-    ln.setAttribute('x1', maj?36:42); ln.setAttribute('x2', 48); ln.setAttribute('y1', y.toFixed(1)); ln.setAttribute('y2', y.toFixed(1)); asi.appendChild(ln);
-    if (maj) { const t = document.createElementNS(PFD_NS, 'text'); t.setAttribute('class','pfd-asi-num'); t.setAttribute('x',34); t.setAttribute('y',(y+3).toFixed(1)); t.setAttribute('text-anchor','end'); t.textContent = v; asi.appendChild(t); }
-  }
-  const lc = ALT_CFG[state.cfg.altU] || ALT_CFG.ft; pfd.altPx = lc.px;
-  for (let v = 0; v <= lc.max; v += lc.step) {
-    const y = -v * lc.px, maj = v % lc.lbl === 0;
-    const ln = document.createElementNS(PFD_NS, 'line'); ln.setAttribute('class', 'pfd-alt-tick');
-    ln.setAttribute('x1', 252); ln.setAttribute('x2', maj?264:258); ln.setAttribute('y1', y.toFixed(1)); ln.setAttribute('y2', y.toFixed(1)); alt.appendChild(ln);
-    if (maj) { const t = document.createElementNS(PFD_NS, 'text'); t.setAttribute('class','pfd-alt-num'); t.setAttribute('x',266); t.setAttribute('y',(y+3).toFixed(1)); t.setAttribute('text-anchor','start'); t.textContent = v; alt.appendChild(t); }
-  }
-  const su = $('#pfd-asi-u'), au = $('#pfd-alt-u');
-  if (su) su.textContent = uSpeed(); if (au) au.textContent = uAlt();
-}
-
-function onOrient(e) {
-  if (e.beta == null && e.gamma == null) return;
-  const ang = (window.screen && screen.orientation && screen.orientation.angle) || (window.orientation || 0) || 0;
-  const b = e.beta || 0, g = e.gamma || 0;
-  let rp, rr;
-  if (ang === 90) { rp = -g; rr = b; }
-  else if (ang === 270 || ang === -90) { rp = g; rr = -b; }
-  else if (ang === 180) { rp = -b; rr = -g; }
-  else { rp = b; rr = g; }
-  pfdRawPitch = rp; pfdRawRoll = rr;
-  let pitch = Math.max(-30, Math.min(30, rp - pfdPitchRef));
-  let roll = rr - pfdRollRef;
-  while (roll > 180) roll -= 360; while (roll < -180) roll += 360;
-  pfd.pitch = pfd.pitch * 0.7 + pitch * 0.3;
-  pfd.roll = pfd.roll * 0.7 + roll * 0.3;
-  if (!pfdRaf) pfdRaf = requestAnimationFrame(() => { pfdRaf = 0; renderPFD(); });
-}
-
-function renderPFD() {
-  if (!pfd.on) return;
-  $('#pfd-pitch').setAttribute('transform', `rotate(${(-pfd.roll).toFixed(1)} 150 110) translate(0 ${(pfd.pitch*2.6).toFixed(1)})`);
-  $('#pfd-roll').setAttribute('transform', `rotate(${(-pfd.roll).toFixed(1)} 150 110)`);
-  const cyT = 113;
-  const spd = state.lastGsKt != null ? cSpeed(state.lastGsKt) : 0;
-  $('#pfd-asi').setAttribute('transform', `translate(0 ${(cyT + spd*pfd.asiPx).toFixed(1)})`);
-  $('#pfd-asi-val').textContent = state.lastGsKt != null ? Math.round(spd) : '--';
-  const altFtCur = state.lastAltM != null ? state.lastAltM * 3.28084 : null;
-  const av = altFtCur != null ? cAlt(altFtCur) : 0;
-  $('#pfd-alt').setAttribute('transform', `translate(0 ${(cyT + av*pfd.altPx).toFixed(1)})`);
-  $('#pfd-alt-val').textContent = altFtCur != null ? Math.round(av) : '--';
-  $('#pfd-hdg').textContent = state.lastTrk != null ? fmtDeg(toMag(state.lastTrk)) : '---';
-}
-
-function startOrient() {
-  if (pfdOrientOn) return; pfdOrientOn = true;
-  window.addEventListener('deviceorientation', onOrient);
-}
-function openPfd() {
-  pfd.on = true; $('#pfd').classList.add('open');
-  buildPfdTapes(); renderPFD();
-  const DOE = window.DeviceOrientationEvent;
-  if (DOE && typeof DOE.requestPermission === 'function') {
-    DOE.requestPermission().then(p => { if (p === 'granted') startOrient(); else { const w = $('#pfdWarn'); if (w) w.textContent = 'Sem acesso aos sensores do aparelho'; } }).catch(() => {});
-  } else { startOrient(); }
-}
-function closePfd() { pfd.on = false; $('#pfd').classList.remove('open'); }
-function pfdLevel() { pfdPitchRef = pfdRawPitch; pfdRollRef = pfdRawRoll; toast('Horizonte nivelado'); }
-
 function switchLayer() {
   state.layerIdx = (state.layerIdx + 1) % baseLayers.length;
   map.removeLayer(currentBaseLayer);
@@ -600,7 +495,6 @@ function onPos(p) {
   if (state.tracking) { state.track.push(ll); trackLine.setLatLngs(state.track); }
 
   updateNavBanner();
-  if (pfd.on) renderPFD();
 }
 const PLANE_SVG =
   '<svg viewBox="0 0 64 64" width="42" height="42" xmlns="http://www.w3.org/2000/svg">'
@@ -1180,7 +1074,6 @@ function applyUnits() {
   set('th-dist', 'Dist (' + uDist() + ')'); set('th-fuel', 'Comb (' + uFuel() + ')');
   renderRoute();
   updateNavBanner();
-  buildPfdTapes();
 }
 async function forceUpdate() {
   toast('Buscando versão nova…');
@@ -1235,9 +1128,6 @@ function wire() {
   });
   $('#btnFollow').classList.toggle('active', state.follow);
   $('#btnLayer').addEventListener('click', switchLayer);
-  $('#btnPfd').addEventListener('click', openPfd);
-  $('#pfdClose').addEventListener('click', closePfd);
-  $('#pfdLevel').addEventListener('click', pfdLevel);
   $('#navClose').addEventListener('click', clearGoto);
   $('#hsiClose').addEventListener('click', clearGoto);
   $('#legClose').addEventListener('click', () => { state.legendHidden = true; LS.set('legendHidden', true); renderAirportMarkers(); });
@@ -1341,7 +1231,6 @@ function init() {
   initMap();
   addDrawButton();
   buildHsiCard();
-  initPfd();
   wire();
   wireIcaoLookup();
   loadCfgUI();
