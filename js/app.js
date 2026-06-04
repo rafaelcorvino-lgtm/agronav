@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v32';
+const APP_VERSION = 'v33';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -472,25 +472,37 @@ function onPos(p) {
     }
   }
 
-  const gsKt = c.speed != null ? c.speed * 1.94384 : null;       // m/s → kt
+  // GS e rumo: usa o do GPS; se o aparelho não reportar, CALCULA pela diferença de posições
+  let gsKt = (c.speed != null && !isNaN(c.speed)) ? c.speed * 1.94384 : null;
+  let trk = (c.heading != null && !isNaN(c.heading)) ? c.heading : null;
+  const nowMs = state.lastFixTime;
+  if ((gsKt == null || trk == null) && state.prevFix) {
+    const dtH = (nowMs - state.prevFix.t) / 3600000;
+    const dNm = haversineNM(state.prevFix, state.pos);
+    if (dtH > 0) {
+      const calcGs = dNm / dtH;
+      if (gsKt == null) gsKt = calcGs;
+      if (trk == null && calcGs > 2 && dNm > 0.004) trk = bearingTrue(state.prevFix, state.pos); // só com movimento real (~7m)
+    }
+  }
+  state.prevFix = { lat: c.latitude, lon: c.longitude, t: nowMs };
   state.lastGsKt = gsKt;
   state.lastAltM = (c.altitude != null && !isNaN(c.altitude)) ? c.altitude : null;
   maybeQueryTerrain(c.latitude, c.longitude);
-  const trk = c.heading != null && !isNaN(c.heading) ? c.heading : null;
-  state.lastTrk = trk;
+  if (trk != null) state.lastTrk = trk;     // mantém o último rumo válido quando parado
   const altFt = c.altitude != null ? c.altitude * 3.28084 : null;
 
   $('#hud-gs').textContent  = gsKt != null ? Math.round(cSpeed(gsKt)) : '--';
-  $('#hud-trk').textContent = trk != null ? fmtDeg(toMag(trk)) : '--';
+  $('#hud-trk').textContent = state.lastTrk != null ? fmtDeg(toMag(state.lastTrk)) : '--';
   $('#hud-alt').textContent = altFt != null ? Math.round(cAlt(altFt)) : '--';
 
   const ll = [c.latitude, c.longitude];
   if (!posMarker) {
-    posMarker = L.marker(ll, { icon: planeIcon(trk || 0) }).addTo(map);
+    posMarker = L.marker(ll, { icon: planeIcon(state.lastTrk || 0) }).addTo(map);
     posAccCircle = L.circle(ll, { radius:c.accuracy || 0, color:'#06b6d4', weight:1, fillOpacity:.08 }).addTo(map);
   } else {
     posMarker.setLatLng(ll);
-    posMarker.setIcon(planeIcon(trk || 0));
+    posMarker.setIcon(planeIcon(state.lastTrk || 0));
     posAccCircle.setLatLng(ll).setRadius(c.accuracy || 0);
   }
   if (state.followMode) recenterFollow(ll);
