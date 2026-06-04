@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v34';
+const APP_VERSION = 'v35';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -498,14 +498,16 @@ function onPos(p) {
 
   const ll = [c.latitude, c.longitude];
   if (!posMarker) {
-    posMarker = L.marker(ll, { icon: planeIcon(state.lastTrk || 0) }).addTo(map);
+    posMarker = L.marker(ll, { icon: planeIcon(0) }).addTo(map);
     posAccCircle = L.circle(ll, { radius:c.accuracy || 0, color:'#06b6d4', weight:1, fillOpacity:.08 }).addTo(map);
   } else {
     posMarker.setLatLng(ll);
-    posMarker.setIcon(planeIcon(state.lastTrk || 0));
     posAccCircle.setLatLng(ll).setRadius(c.accuracy || 0);
   }
   if (state.followMode) recenterFollow(ll);
+  // ícone do avião: rumo + rotação do mapa (o plugin mantém os marcadores "em pé").
+  // No track-up isso dá ~0 = avião travado pra cima; no norte-acima mostra o rumo real.
+  posMarker.setIcon(planeIcon((state.lastTrk || 0) + (state.curBearing || 0)));
 
   if (state.tracking) { state.track.push(ll); trackLine.setLatLngs(state.track); }
 
