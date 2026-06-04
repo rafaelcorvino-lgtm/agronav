@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v36';
+const APP_VERSION = 'v37';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -493,6 +493,19 @@ function onPos(p) {
   maybeQueryTerrain(c.latitude, c.longitude);
   if (trk != null) state.lastTrk = trk;     // mantém o último rumo válido quando parado
   const altFt = c.altitude != null ? c.altitude * 3.28084 : null;
+  // velocidade vertical (razão de subida) em ft/min, pela variação de altitude (suavizada)
+  if (altFt != null) {
+    if (state.prevAlt) {
+      const dtMin = (nowMs - state.prevAlt.t) / 60000;
+      if (dtMin >= 0.02) {                  // ~1,2 s mínimo
+        const vs = (altFt - state.prevAlt.ft) / dtMin;
+        state.lastVs = (state.lastVs == null) ? vs : state.lastVs * 0.6 + vs * 0.4;
+        state.prevAlt = { ft: altFt, t: nowMs };
+      }
+    } else {
+      state.prevAlt = { ft: altFt, t: nowMs };
+    }
+  }
 
   $('#hud-gs').textContent  = gsKt != null ? Math.round(cSpeed(gsKt)) : '--';
   $('#hud-trk').textContent = state.lastTrk != null ? fmtDeg(toMag(state.lastTrk)) : '--';
@@ -650,7 +663,8 @@ function updateHSI(d) {
     agl: d.agl != null ? cAlt(d.agl) : null,
     alt: state.lastAltM != null ? cAlt(state.lastAltM * 3.28084) : null,
     ete: fmtHM(d.eteH), eta: d.eta,
-    xtk: cDist(Math.abs(d.xtk)), xtkSide: d.xtk > 0.02 ? '▶' : (d.xtk < -0.02 ? '◀' : '')
+    xtk: cDist(Math.abs(d.xtk)), xtkSide: d.xtk > 0.02 ? '▶' : (d.xtk < -0.02 ? '◀' : ''),
+    vs: state.lastVs
   };
   renderHsiWidgets();
 }
@@ -710,9 +724,10 @@ function updateNavBanner() {
 const HSI_METRICS = {
   gs:{l:'GS',u:()=>uSpeed()}, dist:{l:'DIST',u:()=>uDist()}, crs:{l:'CURSO',u:()=>'°'},
   rmo:{l:'RUMO',u:()=>'°'}, trk:{l:'PROA',u:()=>'°'}, agl:{l:'AGL',u:()=>uAlt()},
-  alt:{l:'ALT',u:()=>uAlt()}, ete:{l:'ETE',u:()=>''}, eta:{l:'ETA',u:()=>''}, xtk:{l:'DESVIO',u:()=>''}
+  alt:{l:'ALT',u:()=>uAlt()}, ete:{l:'ETE',u:()=>''}, eta:{l:'ETA',u:()=>''}, xtk:{l:'DESVIO',u:()=>''},
+  vs:{l:'V.VERT',u:()=>state.cfg.altU === 'm' ? 'm/s' : 'fpm'}
 };
-const HSI_METRIC_ORDER = ['gs','dist','crs','rmo','trk','agl','alt','ete','eta','xtk'];
+const HSI_METRIC_ORDER = ['gs','dist','crs','rmo','trk','agl','alt','vs','ete','eta','xtk'];
 const DEFAULT_HSI_WIDGETS = [
   {m:'gs',x:.13,y:.84},{m:'dist',x:.38,y:.84},{m:'crs',x:.63,y:.84},{m:'agl',x:.87,y:.84},
   {m:'ete',x:.2,y:.94},{m:'eta',x:.5,y:.94},{m:'xtk',x:.8,y:.94}
@@ -727,7 +742,8 @@ function metricStr(m) {
     crs: d.crs != null ? fmtDeg(d.crs) : '--', rmo: d.rmo != null ? fmtDeg(d.rmo) : '--',
     trk: d.trk != null ? fmtDeg(d.trk) : '--', agl: d.agl != null ? Math.round(d.agl) : '--',
     alt: d.alt != null ? Math.round(d.alt) : '--', ete: d.ete || '--', eta: d.eta || '--',
-    xtk: d.xtk != null ? d.xtk.toFixed(2) : '--'
+    xtk: d.xtk != null ? d.xtk.toFixed(2) : '--',
+    vs: d.vs != null ? (state.cfg.altU === 'm' ? (d.vs * 0.00508).toFixed(1) : String(Math.round(d.vs / 10) * 10)) : '--'
   };
   const unit = m === 'xtk' ? (d.xtkSide || '') : (HSI_METRICS[m] ? HSI_METRICS[m].u() : '');
   return [map[m] != null ? map[m] : '--', unit];
