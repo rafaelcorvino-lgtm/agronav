@@ -81,8 +81,49 @@
                 <div class="leg-row"><span class="leg-strip" style="width:9px"></span>Pequeno</div>
             </div>
 
-            <!-- Active leg / nav banner -->
-            <div class="nav-banner hidden" id="navBanner">
+            <!-- HSI (instrumento de voo) — retrato em modo navegação -->
+            <div id="hsi">
+                <div class="hsi-head">
+                    <span class="hsi-to"><i class="fas fa-diamond-turn-right"></i> <span id="hsi-to">—</span></span>
+                    <button class="hsi-close" id="hsiClose" title="Encerrar navegação">&times;</button>
+                </div>
+                <div class="hsi-instr">
+                    <svg id="hsiSvg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="100" cy="100" r="98" fill="#0b1219"/>
+                        <circle cx="100" cy="100" r="94" fill="none" stroke="#2a3f52" stroke-width="1.5"/>
+                        <g id="hsi-card"></g>
+                        <g id="hsi-course">
+                            <circle cx="62" cy="100" r="2.4" class="hsi-dot"/>
+                            <circle cx="81" cy="100" r="2.4" class="hsi-dot"/>
+                            <circle cx="119" cy="100" r="2.4" class="hsi-dot"/>
+                            <circle cx="138" cy="100" r="2.4" class="hsi-dot"/>
+                            <polygon points="100,20 92,36 108,36" class="hsi-crs-head"/>
+                            <line x1="100" y1="36" x2="100" y2="62" class="hsi-crs-line"/>
+                            <line x1="100" y1="138" x2="100" y2="170" class="hsi-crs-line"/>
+                            <line id="hsi-cdi" x1="100" y1="62" x2="100" y2="138" class="hsi-cdi"/>
+                        </g>
+                        <polygon points="100,5 92,19 108,19" class="hsi-lubber"/>
+                        <g class="hsi-plane">
+                            <line x1="100" y1="86" x2="100" y2="116"/>
+                            <line x1="86" y1="100" x2="114" y2="100"/>
+                            <line x1="92" y1="112" x2="108" y2="112"/>
+                        </g>
+                    </svg>
+                    <div class="hsi-trkbox"><span id="hsi-trk">---</span>°</div>
+                </div>
+                <div class="hsi-readouts">
+                    <div><span class="hr-l">GS</span><b id="hsi-gs">--</b><span class="hr-u" id="hsi-gsu">kt</span></div>
+                    <div><span class="hr-l">DIST</span><b id="hsi-dist">--</b><span class="hr-u" id="hsi-distu">NM</span></div>
+                    <div><span class="hr-l">CURSO</span><b id="hsi-crs">--</b><span class="hr-u">°</span></div>
+                    <div><span class="hr-l">AGL</span><b id="hsi-agl">--</b><span class="hr-u" id="hsi-aglu">ft</span></div>
+                    <div><span class="hr-l">ETE</span><b id="hsi-ete">--</b></div>
+                    <div><span class="hr-l">ETA</span><b id="hsi-eta">--</b></div>
+                    <div><span class="hr-l">DESVIO</span><b id="hsi-xtk">--</b><span class="hr-u" id="hsi-xtks"></span></div>
+                </div>
+            </div>
+
+            <!-- Active leg / nav banner (paisagem) -->
+            <div class="nav-banner" id="navBanner">
                 <button class="nav-banner-close" id="navClose" title="Encerrar navegação">&times;</button>
                 <div class="nav-banner-to">
                     <i class="fas fa-diamond-turn-right"></i>

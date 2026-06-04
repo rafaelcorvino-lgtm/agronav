@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v25';
+const APP_VERSION = 'v26';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -339,12 +339,14 @@ function airportPopup(a) {
 /* ---------- Navegação direta (Direct-To) ---------- */
 function directTo(a) {
   state.gotoTarget = { name: a.icao || a.name, lat: a.lat, lon: a.lon };
+  state.navStart = state.pos ? { lat: state.pos.lat, lon: state.pos.lon } : null;
   updateNavBanner();
   if (state.watchId === null) toast('Navegando até ' + state.gotoTarget.name + ' — ative o GPS p/ dados ao vivo');
   else toast('Navegando até ' + state.gotoTarget.name);
 }
 function clearGoto() {
   state.gotoTarget = null;
+  state.navStart = null;
   gotoLine.setLatLngs([]);
   updateNavBanner();
 }
@@ -450,6 +452,7 @@ function updateGpsAge() {
 function onPos(p) {
   const c = p.coords;
   state.pos = { lat:c.latitude, lon:c.longitude };
+  if (state.gotoTarget && !state.navStart) state.navStart = { lat:c.latitude, lon:c.longitude };
   setGpsBadge('gps-on', 'ativo');
   state.gpsFixes = (state.gpsFixes || 0) + 1;
   state.lastFixTime = Date.now();
@@ -471,10 +474,11 @@ function onPos(p) {
   state.lastAltM = (c.altitude != null && !isNaN(c.altitude)) ? c.altitude : null;
   maybeQueryTerrain(c.latitude, c.longitude);
   const trk = c.heading != null && !isNaN(c.heading) ? c.heading : null;
+  state.lastTrk = trk;
   const altFt = c.altitude != null ? c.altitude * 3.28084 : null;
 
   $('#hud-gs').textContent  = gsKt != null ? Math.round(cSpeed(gsKt)) : '--';
-  $('#hud-trk').textContent = trk != null ? fmtDeg(trk) : '--';
+  $('#hud-trk').textContent = trk != null ? fmtDeg(toMag(trk)) : '--';
   $('#hud-alt').textContent = altFt != null ? Math.round(cAlt(altFt)) : '--';
 
   const ll = [c.latitude, c.longitude];
@@ -541,38 +545,107 @@ function fmtClock(d) {
 }
 
 /* ---------- Nav banner (to next waypoint) ---------- */
+// desvio lateral (cross-track) em NM da perna start→end, na posição pos. + = direita do curso
+function crossTrackNm(start, end, pos) {
+  if (!start || !end || !pos) return 0;
+  const d13 = haversineNM(start, pos) / R_NM;             // distância angular
+  const th13 = toRad(bearingTrue(start, pos));
+  const th12 = toRad(bearingTrue(start, end));
+  return Math.asin(Math.max(-1, Math.min(1, Math.sin(d13) * Math.sin(th13 - th12)))) * R_NM;
+}
+
+// gera a rosa dos ventos do HSI (uma vez)
+function buildHsiCard() {
+  const card = $('#hsi-card');
+  if (!card || card.childNodes.length) return;
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  for (let a = 0; a < 360; a += 5) {
+    const maj = a % 10 === 0;
+    const rad = (a - 90) * Math.PI / 180;
+    const r1 = 93, r2 = maj ? 84 : 88;
+    const ln = document.createElementNS(SVGNS, 'line');
+    ln.setAttribute('x1', (100 + r1 * Math.cos(rad)).toFixed(1));
+    ln.setAttribute('y1', (100 + r1 * Math.sin(rad)).toFixed(1));
+    ln.setAttribute('x2', (100 + r2 * Math.cos(rad)).toFixed(1));
+    ln.setAttribute('y2', (100 + r2 * Math.sin(rad)).toFixed(1));
+    ln.setAttribute('class', 'hsi-tick' + (maj ? ' maj' : ''));
+    card.appendChild(ln);
+    if (a % 30 === 0) {
+      const letter = { 0:'N', 90:'E', 180:'S', 270:'W' }[a];
+      const t = document.createElementNS(SVGNS, 'text');
+      const rt = 74, tx = 100 + rt * Math.cos(rad), ty = 100 + rt * Math.sin(rad);
+      t.setAttribute('x', tx.toFixed(1));
+      t.setAttribute('y', (ty + 4).toFixed(1));
+      t.setAttribute('transform', `rotate(${a} ${tx.toFixed(1)} ${ty.toFixed(1)})`);
+      t.setAttribute('class', letter ? 'hsi-cardltr' : 'hsi-cardnum');
+      t.textContent = letter || String(a / 10);
+      card.appendChild(t);
+    }
+  }
+}
+
+function updateHSI(d) {
+  const card = $('#hsi-card'); if (!card) return;
+  $('#hsi-card').setAttribute('transform', `rotate(${(-d.trkMag).toFixed(1)} 100 100)`);
+  $('#hsi-course').setAttribute('transform', `rotate(${(d.courseMag - d.trkMag).toFixed(1)} 100 100)`);
+  const FULL = 2, MAXPX = 38;                              // escala cheia = 2 NM
+  const defl = Math.max(-1, Math.min(1, (d.xtk || 0) / FULL)) * MAXPX;
+  $('#hsi-cdi').setAttribute('transform', `translate(${(-defl).toFixed(1)} 0)`);  // dir do curso → barra à esq
+  const set = (id, v) => { const e = $('#' + id); if (e) e.textContent = v; };
+  set('hsi-trk', d.trkMag != null ? fmtDeg(d.trkMag) : '---');
+  set('hsi-crs', fmtDeg(d.courseMag));
+  set('hsi-gs', d.gsRaw != null ? Math.round(cSpeed(d.gsRaw)) : '--'); set('hsi-gsu', uSpeed());
+  set('hsi-dist', cDist(d.dist).toFixed(1)); set('hsi-distu', uDist());
+  set('hsi-agl', d.agl != null ? Math.round(cAlt(d.agl)) : '--'); set('hsi-aglu', uAlt());
+  set('hsi-ete', fmtHM(d.eteH));
+  set('hsi-eta', d.eta);
+  set('hsi-xtk', cDist(Math.abs(d.xtk)).toFixed(2)); set('hsi-xtks', d.xtk > 0.02 ? '▶' : (d.xtk < -0.02 ? '◀' : ''));
+}
+
 function updateNavBanner() {
-  const banner = $('#navBanner');
-  // "Navegar até" (direct-to) tem prioridade; senão segue a rota
   const target = state.gotoTarget
     || (state.route.length ? state.route[Math.min(state.activeNavIdx, state.route.length - 1)] : null);
-  if (!target) { banner.classList.add('hidden'); if (gotoLine) gotoLine.setLatLngs([]); return; }
-  banner.classList.remove('hidden');
-  $('#nav-to-name').textContent = target.name;
-  // GS e AGL (estado atual da aeronave)
-  $('#nav-gs').textContent = (state.lastGsKt != null) ? Math.round(cSpeed(state.lastGsKt)) : '--';
-  const agl = aglFt();
-  $('#nav-agl').textContent = (agl != null) ? Math.round(cAlt(agl)) : '--';
-  if (!state.pos) {                 // sem GPS: mostra destino, pede GPS
-    $('#nav-dist').textContent = '--';
-    $('#nav-brg').textContent = '--';
-    $('#nav-ete').textContent = 'GPS?';
-    $('#nav-eta').textContent = '--';
+  document.body.classList.toggle('nav-on', !!target);
+  if (!target) { if (gotoLine) gotoLine.setLatLngs([]); return; }
+  const nm = target.name;
+  $('#nav-to-name').textContent = nm; const ht = $('#hsi-to'); if (ht) ht.textContent = nm;
+
+  if (!state.pos) {                 // sem GPS
+    ['nav-gs','nav-agl','nav-dist','nav-brg','nav-eta','hsi-gs','hsi-agl','hsi-dist','hsi-crs','hsi-trk','hsi-eta','hsi-xtk'].forEach(id => { const e = $('#' + id); if (e) e.textContent = '--'; });
+    $('#nav-ete').textContent = 'GPS?'; const he = $('#hsi-ete'); if (he) he.textContent = 'GPS?';
     if (state.gotoTarget) gotoLine.setLatLngs([]);
     return;
   }
+
+  // início da perna (p/ curso e desvio): direct-to = ativação; rota = waypoint anterior
+  let legStart = state.gotoTarget ? state.navStart
+    : (state.activeNavIdx > 0 ? state.route[state.activeNavIdx - 1] : null);
+  legStart = legStart || state.pos;
+
   const dist = haversineNM(state.pos, target);
-  const brg = toMag(bearingTrue(state.pos, target));
+  const brgMag = toMag(bearingTrue(state.pos, target));
+  const courseTrue = bearingTrue(legStart, target);
+  const trkTrue = (state.lastTrk != null) ? state.lastTrk : courseTrue;
+  const xtk = crossTrackNm(legStart, target, state.pos);
+  const agl = aglFt();
+  const gsRaw = state.lastGsKt;
+  const gsForEte = (gsRaw && gsRaw > 5) ? gsRaw : (Number(state.cfg.tas) || 110);
+  const eteH = dist / gsForEte;
+  const eta = isFinite(eteH) ? fmtClock(new Date(Date.now() + eteH * 3600000)) : '--';
+
+  // painel (paisagem)
+  $('#nav-gs').textContent = gsRaw != null ? Math.round(cSpeed(gsRaw)) : '--';
+  $('#nav-agl').textContent = agl != null ? Math.round(cAlt(agl)) : '--';
   $('#nav-dist').textContent = cDist(dist).toFixed(1);
-  $('#nav-brg').textContent = fmtDeg(brg);
-  // ETE e ETA pela velocidade do solo real (GS) — cai p/ TAS de cruzeiro se parado
-  const gs = (state.lastGsKt && state.lastGsKt > 5) ? state.lastGsKt : (Number(state.cfg.tas) || 110);
-  const eteH = dist / gs;
+  $('#nav-brg').textContent = fmtDeg(brgMag);
   $('#nav-ete').textContent = fmtHM(eteH);
-  $('#nav-eta').textContent = isFinite(eteH) ? fmtClock(new Date(Date.now() + eteH * 3600000)) : '--';
+  $('#nav-eta').textContent = eta;
+
+  // HSI (retrato)
+  updateHSI({ trkTrue, trkMag: toMag(trkTrue), courseTrue, courseMag: toMag(courseTrue), xtk, dist, agl, gsRaw, eteH, eta });
+
   if (state.gotoTarget) gotoLine.setLatLngs([[state.pos.lat, state.pos.lon], [target.lat, target.lon]]);
-  // auto-avança waypoint só quando navegando uma rota
-  if (!state.gotoTarget && dist < 0.5 && state.activeNavIdx < state.route.length - 1) state.activeNavIdx++;
+  if (!state.gotoTarget && dist < 0.5 && state.activeNavIdx < state.route.length - 1) { state.activeNavIdx++; state.navStart = null; }
 }
 
 /* ===================================================================
@@ -1051,6 +1124,7 @@ function wire() {
   $('#btnFollow').classList.toggle('active', state.follow);
   $('#btnLayer').addEventListener('click', switchLayer);
   $('#navClose').addEventListener('click', clearGoto);
+  $('#hsiClose').addEventListener('click', clearGoto);
   $('#legClose').addEventListener('click', () => { state.legendHidden = true; LS.set('legendHidden', true); renderAirportMarkers(); });
   $('#legRestore').addEventListener('click', () => { state.legendHidden = false; LS.set('legendHidden', false); renderAirportMarkers(); });
   $('#btnTrack').addEventListener('click', () => {
@@ -1151,6 +1225,7 @@ function addDrawButton() {
 function init() {
   initMap();
   addDrawButton();
+  buildHsiCard();
   wire();
   wireIcaoLookup();
   loadCfgUI();

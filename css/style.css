@@ -102,7 +102,36 @@ body {
 .map-btn:hover { background:var(--bg-card); }
 .map-btn.active { background:var(--accent-cyan); color:#04161c; border-color:var(--accent-cyan); }
 
-.nav-banner { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:500; background:rgba(15,25,35,.9); backdrop-filter:blur(8px); border:1px solid var(--accent-cyan); border-radius:var(--radius); padding:10px 18px; box-shadow:var(--shadow); min-width:300px; }
+.nav-banner { display:none; position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:500; background:rgba(15,25,35,.9); backdrop-filter:blur(8px); border:1px solid var(--accent-cyan); border-radius:var(--radius); padding:10px 18px; box-shadow:var(--shadow); min-width:300px; }
+
+/* ===== HSI (instrumento de voo) ===== */
+#hsi { display:none; position:fixed; left:0; right:0; bottom:0; height:50vh; height:50dvh; z-index:600; flex-direction:column; align-items:center; gap:6px; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); background:rgba(8,14,20,.97); backdrop-filter:blur(6px); border-top:1px solid var(--accent-cyan); box-shadow:0 -8px 30px rgba(0,0,0,.6); }
+.hsi-head { width:100%; display:flex; align-items:center; justify-content:space-between; }
+.hsi-head .hsi-to { font-size:16px; font-weight:700; color:var(--accent-cyan); }
+.hsi-close { width:30px; height:30px; border-radius:50%; border:1px solid var(--border-color); background:var(--bg-card); color:var(--text-secondary); font-size:20px; line-height:1; cursor:pointer; }
+.hsi-instr { position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+#hsiSvg { height:100%; width:auto; max-width:96vw; aspect-ratio:1; }
+.hsi-trkbox { position:absolute; top:2%; left:50%; transform:translateX(-50%); background:#0b1219; border:1px solid var(--accent-cyan); border-radius:4px; padding:1px 7px; font-size:15px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums; }
+.hsi-readouts { width:100%; display:grid; grid-template-columns:repeat(4,1fr); gap:5px 6px; }
+.hsi-readouts > div { background:var(--bg-card); border:1px solid var(--border-color); border-radius:7px; padding:4px 6px; display:flex; align-items:baseline; gap:3px; overflow:hidden; min-width:0; }
+.hsi-readouts .hr-l { font-size:9px; color:var(--text-muted); font-weight:700; letter-spacing:.3px; flex:none; }
+.hsi-readouts b { font-size:15px; color:var(--accent-green); font-variant-numeric:tabular-nums; margin-left:auto; }
+.hsi-readouts .hr-u { font-size:9px; color:var(--text-muted); flex:none; }
+/* SVG do HSI */
+#hsiSvg .hsi-tick { stroke:#5a6f82; stroke-width:1; }
+#hsiSvg .hsi-tick.maj { stroke:#aebed0; stroke-width:1.4; }
+#hsiSvg .hsi-cardnum { fill:#e8edf2; font-size:11px; font-weight:700; text-anchor:middle; font-family:'Segoe UI',sans-serif; }
+#hsiSvg .hsi-cardltr { fill:var(--accent-cyan); font-size:13px; font-weight:800; text-anchor:middle; }
+#hsiSvg .hsi-lubber { fill:var(--accent-orange); }
+#hsiSvg .hsi-plane line { stroke:#ffd23f; stroke-width:3; stroke-linecap:round; }
+#hsiSvg .hsi-crs-line { stroke:var(--accent-cyan); stroke-width:3; }
+#hsiSvg .hsi-crs-head { fill:var(--accent-cyan); }
+#hsiSvg .hsi-cdi { stroke:var(--accent-green); stroke-width:3.5; }
+#hsiSvg .hsi-dot { fill:none; stroke:#8a9bb0; stroke-width:1.2; }
+
+/* navegando: retrato mostra HSI; paisagem mostra o painel */
+@media (orientation:portrait) { body.nav-on #hsi { display:flex; } }
+@media (orientation:landscape) { body.nav-on .nav-banner { display:block; } }
 .nav-banner-to { display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; color:var(--accent-cyan); margin-bottom:6px; }
 .nav-banner-data { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
 .nb-label { display:block; font-size:9px; color:var(--text-muted); font-weight:600; letter-spacing:1px; }
