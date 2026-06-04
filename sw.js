@@ -4,7 +4,7 @@
      quando há internet; cai pro cache só offline. (evita ficar preso em versão velha)
    - Recursos externos (tiles do mapa, Leaflet, FontAwesome): CACHE PRIMEIRO → rápido e
      funciona offline depois da 1ª visita. */
-const CACHE = 'agronav-v30';
+const CACHE = 'agronav-v31';
 const SHELL = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const SHELL = [
   './icons/icon-512.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'
 ];
 

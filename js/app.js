@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v30';
+const APP_VERSION = 'v31';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -20,7 +20,8 @@ const state = {
   route: LS.get('route', []),          // [{name, lat, lon}]
   savedRoutes: LS.get('savedRoutes', []),
   fields: LS.get('fields', []),        // [{id, name, coords:[[lat,lon]...], area}]
-  follow: true,
+  followMode: 1,   // 0=livre, 1=norte acima (seguir), 2=proa acima (track-up)
+  curBearing: 0,
   tracking: false,
   track: [],
   addWpMode: false,
@@ -129,7 +130,7 @@ const baseLayers = [
 let currentBaseLayer;
 
 function initMap() {
-  map = L.map('map', { zoomControl:false, attributionControl:true }).setView([-15.78, -47.92], 5);
+  map = L.map('map', { zoomControl:false, attributionControl:true, rotate:true, touchRotate:false, shiftKeyRotate:false, rotateControl:false, bearing:0 }).setView([-15.78, -47.92], 5);
   L.control.zoom({ position:'bottomright' }).addTo(map);
   currentBaseLayer = baseLayers[0].layer().addTo(map);
 
@@ -143,7 +144,7 @@ function initMap() {
   map.on('moveend', renderAirportMarkers);
   // ao girar a tela, reposiciona o avião (HSI muda a área visível)
   window.addEventListener('resize', () => {
-    if (state.follow && state.pos) setTimeout(() => recenterFollow([state.pos.lat, state.pos.lon]), 120);
+    setTimeout(() => { if (map) map.invalidateSize({ animate: false }); if (state.followMode && state.pos) recenterFollow([state.pos.lat, state.pos.lon]); }, 150);
   });
   drawRouteOnMap();
   drawFieldsOnMap();
@@ -494,7 +495,7 @@ function onPos(p) {
     posMarker.setIcon(planeIcon(trk || 0));
     posAccCircle.setLatLng(ll).setRadius(c.accuracy || 0);
   }
-  if (state.follow) recenterFollow(ll);
+  if (state.followMode) recenterFollow(ll);
 
   if (state.tracking) { state.track.push(ll); trackLine.setLatLngs(state.track); }
 
@@ -512,15 +513,29 @@ const PLANE_SVG =
   + '</svg>';
 
 function isPortrait() { return window.innerHeight >= window.innerWidth; }
-// recentra o mapa no avião; com o HSI aberto (retrato), centraliza na METADE DE CIMA visível
+// recentra o mapa no avião; modo 2 (track-up) gira o mapa pela proa
 function recenterFollow(ll) {
+  if (!map) return;
   const z = Math.max(map.getZoom(), 12);
-  if (document.body.classList.contains('nav-on') && isPortrait()) {
-    const pt = map.project(ll, z).add([0, map.getSize().y * 0.25]);
-    map.setView(map.unproject(pt, z), z, { animate: false });
-  } else {
-    map.setView(ll, z, { animate: false });
+  if (map.setBearing) {
+    if (state.followMode === 2) {
+      // proa pra cima: só atualiza o rumo quando há velocidade (evita girar parado)
+      if (state.lastTrk != null && state.lastGsKt != null && state.lastGsKt > 3) state.curBearing = -state.lastTrk;
+      map.setBearing(state.curBearing || 0);
+    } else {
+      state.curBearing = 0;
+      map.setBearing(0);
+    }
   }
+  map.setView(ll, z, { animate: false });
+}
+function updateFollowBtn() {
+  const b = $('#btnFollow'); if (!b) return;
+  const i = b.querySelector('i');
+  b.classList.toggle('active', state.followMode > 0);
+  if (state.followMode === 2) { i.className = 'fas fa-location-arrow'; b.title = 'Seguindo: proa pra cima — toque p/ livre'; }
+  else if (state.followMode === 1) { i.className = 'fas fa-crosshairs'; b.title = 'Seguindo: norte acima — toque p/ proa pra cima'; }
+  else { i.className = 'fas fa-crosshairs'; b.title = 'Livre — toque p/ seguir'; }
 }
 
 function planeIcon(heading) {
@@ -628,7 +643,7 @@ function updateNavBanner() {
     || (state.route.length ? state.route[Math.min(state.activeNavIdx, state.route.length - 1)] : null);
   const isNav = !!target, wasNav = document.body.classList.contains('nav-on');
   document.body.classList.toggle('nav-on', isNav);
-  if (wasNav !== isNav && state.follow && state.pos && map) recenterFollow([state.pos.lat, state.pos.lon]);
+  if (wasNav !== isNav && map) setTimeout(() => { map.invalidateSize({ animate: false }); if (state.followMode && state.pos) recenterFollow([state.pos.lat, state.pos.lon]); }, 80);
   if (!target) { if (gotoLine) gotoLine.setLatLngs([]); return; }
   const nm = target.name;
   $('#nav-to-name').textContent = nm; const ht = $('#hsi-to'); if (ht) ht.textContent = nm;
@@ -1140,11 +1155,12 @@ function wire() {
   // Map controls
   $('#btnLocate').addEventListener('click', toggleGPS);
   $('#btnFollow').addEventListener('click', () => {
-    state.follow = !state.follow;
-    $('#btnFollow').classList.toggle('active', state.follow);
-    if (state.follow && state.pos) recenterFollow([state.pos.lat, state.pos.lon]);
+    state.followMode = (state.followMode + 1) % 3;   // 1→2→0→1
+    updateFollowBtn();
+    if (state.followMode === 0) { if (map.setBearing) map.setBearing(0); state.curBearing = 0; }
+    else if (state.pos) recenterFollow([state.pos.lat, state.pos.lon]);
   });
-  $('#btnFollow').classList.toggle('active', state.follow);
+  updateFollowBtn();
   $('#btnLayer').addEventListener('click', switchLayer);
   $('#navClose').addEventListener('click', clearGoto);
   $('#hsiClose').addEventListener('click', clearGoto);

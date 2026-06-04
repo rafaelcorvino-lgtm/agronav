@@ -136,7 +136,7 @@ body {
 #hsiSvg .hsi-srclbl { fill:#22d3ee; font-size:9px; font-weight:700; font-family:'Segoe UI',sans-serif; }
 
 /* navegando: retrato mostra HSI; paisagem mostra o painel */
-@media (orientation:portrait) { body.nav-on #hsi { display:flex; } }
+@media (orientation:portrait) { body.nav-on #hsi { display:flex; } body.nav-on #map { bottom:50dvh; } }
 @media (orientation:landscape) { body.nav-on .nav-banner { display:block; } }
 .nav-banner-to { display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; color:var(--accent-cyan); margin-bottom:6px; }
 .nav-banner-data { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
