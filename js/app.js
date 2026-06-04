@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v35';
+const APP_VERSION = 'v36';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -34,7 +34,9 @@ const state = {
   showAirports: true,
   gotoTarget: null,
   legendHidden: LS.get('legendHidden', false),
-  showAirspace: LS.get('showAirspace', false)
+  showAirspace: LS.get('showAirspace', false),
+  hsiWidgets: LS.get('hsiWidgets', null),
+  navData: {}
 };
 
 /* ---------- Geo math ---------- */
@@ -639,15 +641,18 @@ function updateHSI(d) {
   const FULL = 2, MAXPX = 38;                              // escala cheia = 2 NM
   const defl = Math.max(-1, Math.min(1, (d.xtk || 0) / FULL)) * MAXPX;
   $('#hsi-cdi').setAttribute('transform', `translate(${(-defl).toFixed(1)} 0)`);  // dir do curso → barra à esq
-  const set = (id, v) => { const e = $('#' + id); if (e) e.textContent = v; };
-  set('hsi-trk', d.trkMag != null ? fmtDeg(d.trkMag) : '---');
-  set('hsi-crs', fmtDeg(d.courseMag));
-  set('hsi-gs', d.gsRaw != null ? Math.round(cSpeed(d.gsRaw)) : '--'); set('hsi-gsu', uSpeed());
-  set('hsi-dist', cDist(d.dist).toFixed(1)); set('hsi-distu', uDist());
-  set('hsi-agl', d.agl != null ? Math.round(cAlt(d.agl)) : '--'); set('hsi-aglu', uAlt());
-  set('hsi-ete', fmtHM(d.eteH));
-  set('hsi-eta', d.eta);
-  set('hsi-xtk', cDist(Math.abs(d.xtk)).toFixed(2)); set('hsi-xtks', d.xtk > 0.02 ? '▶' : (d.xtk < -0.02 ? '◀' : ''));
+  const lb = $('#hsi-trk'); if (lb) lb.textContent = d.trkMag != null ? fmtDeg(d.trkMag) : '---';  // lubber
+  // dados dos widgets (já nas unidades escolhidas)
+  state.navData = {
+    gs: d.gsRaw != null ? cSpeed(d.gsRaw) : null,
+    dist: cDist(d.dist),
+    crs: d.courseMag, rmo: d.brgMag, trk: d.trkMag,
+    agl: d.agl != null ? cAlt(d.agl) : null,
+    alt: state.lastAltM != null ? cAlt(state.lastAltM * 3.28084) : null,
+    ete: fmtHM(d.eteH), eta: d.eta,
+    xtk: cDist(Math.abs(d.xtk)), xtkSide: d.xtk > 0.02 ? '▶' : (d.xtk < -0.02 ? '◀' : '')
+  };
+  renderHsiWidgets();
 }
 
 function updateNavBanner() {
@@ -661,8 +666,11 @@ function updateNavBanner() {
   $('#nav-to-name').textContent = nm; const ht = $('#hsi-to'); if (ht) ht.textContent = nm;
 
   if (!state.pos) {                 // sem GPS
-    ['nav-gs','nav-agl','nav-dist','nav-brg','nav-eta','hsi-gs','hsi-agl','hsi-dist','hsi-crs','hsi-trk','hsi-eta','hsi-xtk'].forEach(id => { const e = $('#' + id); if (e) e.textContent = '--'; });
-    $('#nav-ete').textContent = 'GPS?'; const he = $('#hsi-ete'); if (he) he.textContent = 'GPS?';
+    ['nav-gs','nav-agl','nav-dist','nav-brg','nav-eta'].forEach(id => { const e = $('#' + id); if (e) e.textContent = '--'; });
+    $('#nav-ete').textContent = 'GPS?';
+    const lb = $('#hsi-trk'); if (lb) lb.textContent = '---';
+    state.navData = { ete: 'GPS?' };
+    renderHsiWidgets();
     if (state.gotoTarget) gotoLine.setLatLngs([]);
     return;
   }
@@ -696,6 +704,105 @@ function updateNavBanner() {
 
   if (state.gotoTarget) gotoLine.setLatLngs([[state.pos.lat, state.pos.lon], [target.lat, target.lon]]);
   if (!state.gotoTarget && dist < 0.5 && state.activeNavIdx < state.route.length - 1) { state.activeNavIdx++; state.navStart = null; }
+}
+
+/* ---------- Widgets do HSI (editáveis e arrastáveis) ---------- */
+const HSI_METRICS = {
+  gs:{l:'GS',u:()=>uSpeed()}, dist:{l:'DIST',u:()=>uDist()}, crs:{l:'CURSO',u:()=>'°'},
+  rmo:{l:'RUMO',u:()=>'°'}, trk:{l:'PROA',u:()=>'°'}, agl:{l:'AGL',u:()=>uAlt()},
+  alt:{l:'ALT',u:()=>uAlt()}, ete:{l:'ETE',u:()=>''}, eta:{l:'ETA',u:()=>''}, xtk:{l:'DESVIO',u:()=>''}
+};
+const HSI_METRIC_ORDER = ['gs','dist','crs','rmo','trk','agl','alt','ete','eta','xtk'];
+const DEFAULT_HSI_WIDGETS = [
+  {m:'gs',x:.13,y:.84},{m:'dist',x:.38,y:.84},{m:'crs',x:.63,y:.84},{m:'agl',x:.87,y:.84},
+  {m:'ete',x:.2,y:.94},{m:'eta',x:.5,y:.94},{m:'xtk',x:.8,y:.94}
+];
+function getHsiWidgets() { if (!state.hsiWidgets) state.hsiWidgets = JSON.parse(JSON.stringify(DEFAULT_HSI_WIDGETS)); return state.hsiWidgets; }
+function saveHsiWidgets() { LS.set('hsiWidgets', state.hsiWidgets); }
+
+function metricStr(m) {
+  const d = state.navData || {};
+  const map = {
+    gs: d.gs != null ? Math.round(d.gs) : '--', dist: d.dist != null ? d.dist.toFixed(1) : '--',
+    crs: d.crs != null ? fmtDeg(d.crs) : '--', rmo: d.rmo != null ? fmtDeg(d.rmo) : '--',
+    trk: d.trk != null ? fmtDeg(d.trk) : '--', agl: d.agl != null ? Math.round(d.agl) : '--',
+    alt: d.alt != null ? Math.round(d.alt) : '--', ete: d.ete || '--', eta: d.eta || '--',
+    xtk: d.xtk != null ? d.xtk.toFixed(2) : '--'
+  };
+  const unit = m === 'xtk' ? (d.xtkSide || '') : (HSI_METRICS[m] ? HSI_METRICS[m].u() : '');
+  return [map[m] != null ? map[m] : '--', unit];
+}
+
+function buildHsiWidgets() {
+  const cont = $('#hsi-widgets'); if (!cont) return;
+  cont.innerHTML = '';
+  getHsiWidgets().forEach((w, i) => {
+    const el = document.createElement('div');
+    el.className = 'hsi-w'; el.dataset.i = i;
+    el.style.left = (w.x * 100) + '%'; el.style.top = (w.y * 100) + '%';
+    el.innerHTML = `<span class="hsi-w-l">${HSI_METRICS[w.m] ? HSI_METRICS[w.m].l : '?'}</span><b class="hsi-w-v">--</b><span class="hsi-w-u"></span>`;
+    attachWidget(el, i);
+    cont.appendChild(el);
+  });
+  renderHsiWidgets();
+}
+
+function renderHsiWidgets() {
+  const cont = $('#hsi-widgets'); if (!cont || !state.hsiWidgets) return;
+  cont.querySelectorAll('.hsi-w').forEach(el => {
+    const i = +el.dataset.i, w = state.hsiWidgets[i]; if (!w) return;
+    const [v, u] = metricStr(w.m);
+    el.querySelector('.hsi-w-v').textContent = v;
+    el.querySelector('.hsi-w-u').textContent = u;
+  });
+}
+
+function attachWidget(el, i) {
+  let lp, dragging = false, sx, sy, moved;
+  el.addEventListener('pointerdown', e => {
+    if (e.button != null && e.button !== 0) return;
+    try { el.setPointerCapture(e.pointerId); } catch (x) {}
+    sx = e.clientX; sy = e.clientY; moved = false; dragging = false;
+    lp = setTimeout(() => { dragging = true; el.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(15); }, 280);
+  });
+  el.addEventListener('pointermove', e => {
+    if (Math.abs(e.clientX - sx) > 6 || Math.abs(e.clientY - sy) > 6) moved = true;
+    if (!dragging) return;
+    e.preventDefault();
+    const r = $('#hsi').getBoundingClientRect();
+    const fx = Math.max(.06, Math.min(.94, (e.clientX - r.left) / r.width));
+    const fy = Math.max(.06, Math.min(.96, (e.clientY - r.top) / r.height));
+    state.hsiWidgets[i].x = fx; state.hsiWidgets[i].y = fy;
+    el.style.left = (fx * 100) + '%'; el.style.top = (fy * 100) + '%';
+  });
+  el.addEventListener('pointerup', () => {
+    clearTimeout(lp);
+    if (dragging) { dragging = false; el.classList.remove('dragging'); saveHsiWidgets(); }
+    else if (!moved) openMetricPicker(i);
+  });
+  el.addEventListener('pointercancel', () => { clearTimeout(lp); dragging = false; el.classList.remove('dragging'); });
+}
+
+function openMetricPicker(i) {
+  const isAdd = i === -1;
+  const ov = document.createElement('div'); ov.className = 'picker-ov';
+  let html = `<div class="picker"><h3>${isAdd ? 'Adicionar informação' : 'Escolher informação'}</h3><div class="picker-grid">`;
+  HSI_METRIC_ORDER.forEach(m => { html += `<button data-m="${m}">${HSI_METRICS[m].l}</button>`; });
+  html += '</div>';
+  if (!isAdd) html += '<button class="picker-del" data-del="1"><i class="fas fa-eye-slash"></i> Esconder este</button>';
+  html += '<button class="picker-cancel">Cancelar</button></div>';
+  ov.innerHTML = html;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  ov.querySelector('.picker-cancel').addEventListener('click', close);
+  ov.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => {
+    if (isAdd) state.hsiWidgets.push({ m: b.dataset.m, x: .5, y: .55 });
+    else state.hsiWidgets[i].m = b.dataset.m;
+    saveHsiWidgets(); buildHsiWidgets(); close();
+  }));
+  const del = ov.querySelector('[data-del]');
+  if (del) del.addEventListener('click', () => { state.hsiWidgets.splice(i, 1); saveHsiWidgets(); buildHsiWidgets(); close(); });
 }
 
 /* ===================================================================
@@ -1119,6 +1226,7 @@ function applyUnits() {
   set('th-dist', 'Dist (' + uDist() + ')'); set('th-fuel', 'Comb (' + uFuel() + ')');
   renderRoute();
   updateNavBanner();
+  renderHsiWidgets();
 }
 async function forceUpdate() {
   toast('Buscando versão nova…');
@@ -1175,6 +1283,7 @@ function wire() {
   $('#btnLayer').addEventListener('click', switchLayer);
   $('#navClose').addEventListener('click', clearGoto);
   $('#hsiClose').addEventListener('click', clearGoto);
+  $('#hsiAdd').addEventListener('click', () => openMetricPicker(-1));
   $('#legClose').addEventListener('click', () => { state.legendHidden = true; LS.set('legendHidden', true); renderAirportMarkers(); });
   $('#legRestore').addEventListener('click', () => { state.legendHidden = false; LS.set('legendHidden', false); renderAirportMarkers(); });
   $('#btnTrack').addEventListener('click', () => {
@@ -1276,6 +1385,7 @@ function init() {
   initMap();
   addDrawButton();
   buildHsiCard();
+  buildHsiWidgets();
   wire();
   wireIcaoLookup();
   loadCfgUI();

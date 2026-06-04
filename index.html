@@ -84,6 +84,8 @@
             <div id="hsi">
                 <div class="hsi-head">
                     <span class="hsi-to"><i class="fas fa-diamond-turn-right"></i> <span id="hsi-to">—</span></span>
+                    <span class="hsi-hint">segure p/ mover · toque p/ trocar</span>
+                    <button class="hsi-add" id="hsiAdd" title="Adicionar informação"><i class="fas fa-plus"></i></button>
                     <button class="hsi-close" id="hsiClose" title="Encerrar navegação">&times;</button>
                 </div>
                 <div class="hsi-instr">
@@ -119,15 +121,7 @@
                     </svg>
                     <div class="hsi-trkbox"><span id="hsi-trk">---</span>°</div>
                 </div>
-                <div class="hsi-readouts">
-                    <div><span class="hr-l">GS</span><b id="hsi-gs">--</b><span class="hr-u" id="hsi-gsu">kt</span></div>
-                    <div><span class="hr-l">DIST</span><b id="hsi-dist">--</b><span class="hr-u" id="hsi-distu">NM</span></div>
-                    <div><span class="hr-l">CURSO</span><b id="hsi-crs">--</b><span class="hr-u">°</span></div>
-                    <div><span class="hr-l">AGL</span><b id="hsi-agl">--</b><span class="hr-u" id="hsi-aglu">ft</span></div>
-                    <div><span class="hr-l">ETE</span><b id="hsi-ete">--</b></div>
-                    <div><span class="hr-l">ETA</span><b id="hsi-eta">--</b></div>
-                    <div><span class="hr-l">DESVIO</span><b id="hsi-xtk">--</b><span class="hr-u" id="hsi-xtks"></span></div>
-                </div>
+                <div id="hsi-widgets"></div>
             </div>
 
             <!-- Active leg / nav banner (paisagem) -->
