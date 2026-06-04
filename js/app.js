@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v29';
+const APP_VERSION = 'v30';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -141,6 +141,10 @@ function initMap() {
 
   map.on('click', onMapClick);
   map.on('moveend', renderAirportMarkers);
+  // ao girar a tela, reposiciona o avião (HSI muda a área visível)
+  window.addEventListener('resize', () => {
+    if (state.follow && state.pos) setTimeout(() => recenterFollow([state.pos.lat, state.pos.lon]), 120);
+  });
   drawRouteOnMap();
   drawFieldsOnMap();
 }
@@ -490,7 +494,7 @@ function onPos(p) {
     posMarker.setIcon(planeIcon(trk || 0));
     posAccCircle.setLatLng(ll).setRadius(c.accuracy || 0);
   }
-  if (state.follow) map.setView(ll, Math.max(map.getZoom(), 12));
+  if (state.follow) recenterFollow(ll);
 
   if (state.tracking) { state.track.push(ll); trackLine.setLatLngs(state.track); }
 
@@ -506,6 +510,18 @@ const PLANE_SVG =
   + '<path d="M19 53 L45 53 L45 50 L36 47.5 L28 47.5 L19 50 Z" fill="#F2C200" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round"/>'  // estabilizador
   + '<ellipse cx="32" cy="23" rx="3.6" ry="6" fill="#143a5f"/>'                                            // cabine
   + '</svg>';
+
+function isPortrait() { return window.innerHeight >= window.innerWidth; }
+// recentra o mapa no avião; com o HSI aberto (retrato), centraliza na METADE DE CIMA visível
+function recenterFollow(ll) {
+  const z = Math.max(map.getZoom(), 12);
+  if (document.body.classList.contains('nav-on') && isPortrait()) {
+    const pt = map.project(ll, z).add([0, map.getSize().y * 0.25]);
+    map.setView(map.unproject(pt, z), z, { animate: false });
+  } else {
+    map.setView(ll, z, { animate: false });
+  }
+}
 
 function planeIcon(heading) {
   return L.divIcon({
@@ -610,7 +626,9 @@ function updateHSI(d) {
 function updateNavBanner() {
   const target = state.gotoTarget
     || (state.route.length ? state.route[Math.min(state.activeNavIdx, state.route.length - 1)] : null);
-  document.body.classList.toggle('nav-on', !!target);
+  const isNav = !!target, wasNav = document.body.classList.contains('nav-on');
+  document.body.classList.toggle('nav-on', isNav);
+  if (wasNav !== isNav && state.follow && state.pos && map) recenterFollow([state.pos.lat, state.pos.lon]);
   if (!target) { if (gotoLine) gotoLine.setLatLngs([]); return; }
   const nm = target.name;
   $('#nav-to-name').textContent = nm; const ht = $('#hsi-to'); if (ht) ht.textContent = nm;
@@ -1124,7 +1142,7 @@ function wire() {
   $('#btnFollow').addEventListener('click', () => {
     state.follow = !state.follow;
     $('#btnFollow').classList.toggle('active', state.follow);
-    if (state.follow && state.pos) map.setView([state.pos.lat, state.pos.lon]);
+    if (state.follow && state.pos) recenterFollow([state.pos.lat, state.pos.lon]);
   });
   $('#btnFollow').classList.toggle('active', state.follow);
   $('#btnLayer').addEventListener('click', switchLayer);
