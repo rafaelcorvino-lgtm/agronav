@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v33';
+const APP_VERSION = 'v34';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -529,8 +529,8 @@ function recenterFollow(ll) {
   const z = Math.max(map.getZoom(), 12);
   if (map.setBearing) {
     if (state.followMode === 2) {
-      // proa pra cima: só atualiza o rumo quando há velocidade (evita girar parado)
-      if (state.lastTrk != null && state.lastGsKt != null && state.lastGsKt > 3) state.curBearing = -state.lastTrk;
+      // proa pra cima: usa o rumo (já vem só com movimento real do onPos)
+      if (state.lastTrk != null) state.curBearing = -state.lastTrk;
       map.setBearing(state.curBearing || 0);
     } else {
       state.curBearing = 0;
@@ -1166,8 +1166,8 @@ function wire() {
   $('#btnFollow').addEventListener('click', () => {
     state.followMode = (state.followMode + 1) % 3;   // 1→2→0→1
     updateFollowBtn();
-    if (state.followMode === 0) { if (map.setBearing) map.setBearing(0); state.curBearing = 0; }
-    else if (state.pos) recenterFollow([state.pos.lat, state.pos.lon]);
+    if (state.followMode === 0) { if (map.setBearing) map.setBearing(0); state.curBearing = 0; toast('Mapa livre'); }
+    else { if (state.pos) recenterFollow([state.pos.lat, state.pos.lon]); toast(state.followMode === 2 ? 'Proa pra cima — o mapa gira ao se mover' : 'Norte acima'); }
   });
   updateFollowBtn();
   $('#btnLayer').addEventListener('click', switchLayer);
