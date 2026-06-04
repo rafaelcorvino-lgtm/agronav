@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v37';
+const APP_VERSION = 'v38';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -764,13 +764,30 @@ function buildHsiWidgets() {
 }
 
 function renderHsiWidgets() {
-  const cont = $('#hsi-widgets'); if (!cont || !state.hsiWidgets) return;
-  cont.querySelectorAll('.hsi-w').forEach(el => {
+  const cont = $('#hsi-widgets');
+  if (cont && state.hsiWidgets) cont.querySelectorAll('.hsi-w').forEach(el => {
     const i = +el.dataset.i, w = state.hsiWidgets[i]; if (!w) return;
     const [v, u] = metricStr(w.m);
     el.querySelector('.hsi-w-v').textContent = v;
     el.querySelector('.hsi-w-u').textContent = u;
   });
+  renderVsi();
+}
+
+// variômetro gráfico (barra de velocidade vertical)
+function renderVsi() {
+  const fill = $('#vsiFill'), valEl = $('#vsiVal'); if (!fill) return;
+  const vs = state.lastVs, SCALE = 2000;          // fundo de escala ±2000 fpm
+  const v = vs == null ? 0 : Math.max(-SCALE, Math.min(SCALE, vs));
+  const pct = (v / SCALE) * 45;                   // % a partir do centro
+  if (v >= 0) { fill.style.top = (50 - pct) + '%'; fill.style.height = pct + '%'; fill.classList.remove('down'); }
+  else { fill.style.top = '50%'; fill.style.height = (-pct) + '%'; fill.classList.add('down'); }
+  if (valEl) {
+    if (vs == null) valEl.textContent = '--';
+    else if (state.cfg.altU === 'm') valEl.textContent = (vs >= 0 ? '+' : '') + (vs * 0.00508).toFixed(1);
+    else valEl.textContent = (vs >= 0 ? '+' : '') + (Math.round(vs / 50) * 50);
+    valEl.style.color = (vs != null && vs < -50) ? 'var(--accent-orange)' : 'var(--accent-green)';
+  }
 }
 
 function attachWidget(el, i) {
