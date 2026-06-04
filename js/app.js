@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v31';
+const APP_VERSION = 'v32';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -416,13 +416,11 @@ function toggleGPS() {
   }
   // SEMPRE alta precisão (GPS real). Não degrada p/ rede — posição de rede erra muito.
   state.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
-  $('#btnLocate').classList.add('active');
   if (!gpsAgeTimer) gpsAgeTimer = setInterval(updateGpsAge, 2000);
 }
 function stopGPS() {
   if (state.watchId !== null) navigator.geolocation.clearWatch(state.watchId);
   state.watchId = null;
-  $('#btnLocate').classList.remove('active');
   setGpsBadge('gps-off', 'GPS off');
   const info = $('#gpsInfo'); if (info) info.classList.add('hidden');
   releaseWakeLock();
@@ -1153,7 +1151,6 @@ function importAll(file) {
    =================================================================== */
 function wire() {
   // Map controls
-  $('#btnLocate').addEventListener('click', toggleGPS);
   $('#btnFollow').addEventListener('click', () => {
     state.followMode = (state.followMode + 1) % 3;   // 1→2→0→1
     updateFollowBtn();
@@ -1275,6 +1272,8 @@ function init() {
   loadAirspace();
   // run E6B defaults
   calcWindTriangle(); calcRunwayWind(); calcTSD(); calcDensityAlt(); calcConvert();
+  // GPS automático ao abrir
+  if (state.watchId === null) toggleGPS();
 }
 document.addEventListener('DOMContentLoaded', init);
 
