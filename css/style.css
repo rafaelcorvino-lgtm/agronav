@@ -72,7 +72,7 @@ body {
 .leaflet-container { background:#0a1119; font-family:inherit; }
 
 /* HUD: camada de widgets selecionáveis/arrastáveis sobre o mapa (cobre a área do #map) */
-#hud-widgets { position:fixed; top:0; left:var(--sidebar-width); right:0; bottom:0; pointer-events:none; z-index:500; }
+#hud-widgets { position:fixed; top:env(safe-area-inset-top); left:var(--sidebar-width); right:0; bottom:0; pointer-events:none; z-index:500; }
 .hud-add { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:calc(var(--sidebar-width) + 14px + env(safe-area-inset-left)); z-index:501; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-color); background:rgba(15,25,35,.85); backdrop-filter:blur(8px); color:var(--accent-cyan); font-size:14px; cursor:pointer; box-shadow:var(--shadow); }
 
 .apt-legend { position:fixed; bottom:16px; left:calc(var(--sidebar-width) + 14px); z-index:500; background:rgba(15,25,35,.85); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:var(--radius); padding:8px 12px; box-shadow:var(--shadow); font-size:12px; display:flex; flex-direction:column; gap:5px; }

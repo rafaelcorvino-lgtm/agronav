@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v43';
+const APP_VERSION = 'v44';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -753,7 +753,7 @@ const DEFAULT_HSI_WIDGETS = [
   {m:'ete',x:.2,y:.94},{m:'eta',x:.5,y:.94},{m:'xtk',x:.8,y:.94}
 ];
 const DEFAULT_HUD_WIDGETS = [
-  {m:'gs',x:.22,y:.05},{m:'trk',x:.5,y:.05},{m:'alt',x:.78,y:.05}
+  {m:'gs',x:.28,y:.03},{m:'trk',x:.55,y:.03},{m:'alt',x:.82,y:.03}
 ];
 const WIDGET_LAYERS = {
   hsiWidgets: { cont:'#hsi-widgets', bounds:'#hsi', def:DEFAULT_HSI_WIDGETS },
@@ -834,7 +834,7 @@ function attachWidget(el, list, i) {
     e.preventDefault();
     const r = $(boundsSel).getBoundingClientRect();
     const fx = Math.max(.04, Math.min(.96, (e.clientX - r.left) / r.width));
-    const fy = Math.max(.03, Math.min(.97, (e.clientY - r.top) / r.height));
+    const fy = Math.max(.015, Math.min(.97, (e.clientY - r.top) / r.height));
     state[list][i].x = fx; state[list][i].y = fy;
     el.style.left = (fx * 100) + '%'; el.style.top = (fy * 100) + '%';
   });
