@@ -71,12 +71,9 @@ body {
 #map { position:fixed; top:0; left:var(--sidebar-width); right:0; bottom:0; background:#0a1119; }
 .leaflet-container { background:#0a1119; font-family:inherit; }
 
-.hud { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:calc(var(--sidebar-width) + 14px + env(safe-area-inset-left)); z-index:500; display:flex; gap:8px; background:rgba(15,25,35,.82); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:var(--radius); padding:10px 12px; box-shadow:var(--shadow); max-width:calc(100vw - 90px); overflow:hidden; }
-.hud-item { display:flex; flex-direction:column; align-items:center; min-width:52px; }
-.hud-label { font-size:10px; color:var(--text-muted); font-weight:600; letter-spacing:1px; }
-.hud-val { font-size:22px; font-weight:700; color:var(--accent-cyan); font-variant-numeric:tabular-nums; line-height:1.1; }
-.hud-val.sm { font-size:13px; color:var(--text-primary); }
-.hud-unit { font-size:9px; color:var(--text-muted); }
+/* HUD: camada de widgets selecionáveis/arrastáveis sobre o mapa (cobre a área do #map) */
+#hud-widgets { position:fixed; top:0; left:var(--sidebar-width); right:0; bottom:0; pointer-events:none; z-index:500; }
+.hud-add { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:calc(var(--sidebar-width) + 14px + env(safe-area-inset-left)); z-index:501; width:32px; height:32px; border-radius:50%; border:1px solid var(--border-color); background:rgba(15,25,35,.85); backdrop-filter:blur(8px); color:var(--accent-cyan); font-size:14px; cursor:pointer; box-shadow:var(--shadow); }
 
 .apt-legend { position:fixed; bottom:16px; left:calc(var(--sidebar-width) + 14px); z-index:500; background:rgba(15,25,35,.85); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:var(--radius); padding:8px 12px; box-shadow:var(--shadow); font-size:12px; display:flex; flex-direction:column; gap:5px; }
 .apt-legend { padding-right:24px; }
@@ -299,9 +296,8 @@ body.nav-on.is-landscape .nav-banner { display:block; }
     .sidebar.open { transform:translateX(0); }
     .main { margin-left:0; }
     #map { left:0; }
-    .hud { left:calc(62px + env(safe-area-inset-left)); top:calc(12px + env(safe-area-inset-top)); padding:8px; gap:5px; }
-    .hud-item { min-width:40px; }
-    .hud-val { font-size:17px; }
+    #hud-widgets { left:0; }
+    .hud-add { left:calc(62px + env(safe-area-inset-left)); top:calc(12px + env(safe-area-inset-top)); }
     .apt-legend { left:10px; bottom:10px; padding:6px 10px; font-size:11px; }
     .leg-restore { left:10px; bottom:10px; }
     .nav-banner { left:10px; right:10px; bottom:66px; transform:none; min-width:0; }
@@ -319,7 +315,7 @@ body.nav-on.is-landscape .nav-banner { display:block; }
 @media (orientation:landscape) and (max-height:520px) {
     .map-btn { width:38px; height:38px; font-size:15px; }
     .map-controls { gap:5px; top:calc(6px + env(safe-area-inset-top)); right:calc(8px + env(safe-area-inset-right)); max-height:calc(100dvh - 12px); }
-    .hud { top:calc(8px + env(safe-area-inset-top)); padding:6px 8px; }
+    .hud-add { top:calc(8px + env(safe-area-inset-top)); }
     .gps-info { top:calc(8px + env(safe-area-inset-top)); }
     .nav-banner { left:10px; right:calc(60px + env(safe-area-inset-right)); bottom:8px; transform:none; min-width:0; }
     .apt-legend, .leg-restore { bottom:8px; }

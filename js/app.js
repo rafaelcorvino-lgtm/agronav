@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v42';
+const APP_VERSION = 'v43';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -36,6 +36,7 @@ const state = {
   legendHidden: LS.get('legendHidden', false),
   showAirspace: LS.get('showAirspace', false),
   hsiWidgets: LS.get('hsiWidgets', null),
+  hudWidgets: LS.get('hudWidgets', null),
   navData: {}
 };
 
@@ -509,9 +510,18 @@ function onPos(p) {
     }
   }
 
-  $('#hud-gs').textContent  = gsKt != null ? Math.round(cSpeed(gsKt)) : '--';
-  $('#hud-trk').textContent = state.lastTrk != null ? fmtDeg(toMag(state.lastTrk)) : '--';
-  $('#hud-alt').textContent = altFt != null ? Math.round(cAlt(altFt)) : '--';
+  // dados de voo "estado da aeronave" (sempre disponíveis, p/ HUD e HSI)
+  const aglNow = aglFt();
+  state.navData = state.navData || {};
+  Object.assign(state.navData, {
+    gs: gsKt != null ? cSpeed(gsKt) : null,
+    trk: state.lastTrk != null ? toMag(state.lastTrk) : null,
+    alt: altFt != null ? cAlt(altFt) : null,
+    agl: aglNow != null ? cAlt(aglNow) : null,
+    vs: state.lastVs,
+    lat: c.latitude.toFixed(4), lon: c.longitude.toFixed(4)
+  });
+  renderWidgets();
 
   const ll = [c.latitude, c.longitude];
   if (!posMarker) {
@@ -662,18 +672,15 @@ function updateHSI(d) {
   const defl = Math.max(-1, Math.min(1, (d.xtk || 0) / FULL)) * MAXPX;
   $('#hsi-cdi').setAttribute('transform', `translate(${(-defl).toFixed(1)} 0)`);  // dir do curso → barra à esq
   const lb = $('#hsi-trk'); if (lb) lb.textContent = d.trkMag != null ? fmtDeg(d.trkMag) : '---';  // lubber
-  // dados dos widgets (já nas unidades escolhidas)
-  state.navData = {
-    gs: d.gsRaw != null ? cSpeed(d.gsRaw) : null,
+  // métricas de navegação (gs/trk/alt/agl/vs/lat/lon vêm do onPos — só mescla as de rota)
+  state.navData = state.navData || {};
+  Object.assign(state.navData, {
     dist: cDist(d.dist),
-    crs: d.courseMag, rmo: d.brgMag, trk: d.trkMag,
-    agl: d.agl != null ? cAlt(d.agl) : null,
-    alt: state.lastAltM != null ? cAlt(state.lastAltM * 3.28084) : null,
+    crs: d.courseMag, rmo: d.brgMag,
     ete: fmtHM(d.eteH), eta: d.eta,
-    xtk: cDist(Math.abs(d.xtk)), xtkSide: d.xtk > 0.02 ? '▶' : (d.xtk < -0.02 ? '◀' : ''),
-    vs: state.lastVs
-  };
-  renderHsiWidgets();
+    xtk: cDist(Math.abs(d.xtk)), xtkSide: d.xtk > 0.02 ? '▶' : (d.xtk < -0.02 ? '◀' : '')
+  });
+  renderWidgets();
 }
 
 function updateNavBanner() {
@@ -682,7 +689,11 @@ function updateNavBanner() {
   const isNav = !!target, wasNav = document.body.classList.contains('nav-on');
   document.body.classList.toggle('nav-on', isNav);
   if (wasNav !== isNav && map) setTimeout(() => { map.invalidateSize({ animate: false }); if (state.followMode && state.pos) recenterFollow([state.pos.lat, state.pos.lon]); }, 80);
-  if (!target) { if (gotoLine) gotoLine.setLatLngs([]); return; }
+  if (!target) {
+    if (gotoLine) gotoLine.setLatLngs([]);
+    if (state.navData) { Object.assign(state.navData, { dist:null, crs:null, rmo:null, ete:null, eta:null, xtk:null, xtkSide:'' }); renderWidgets(); }
+    return;
+  }
   const nm = target.name;
   $('#nav-to-name').textContent = nm; const ht = $('#hsi-to'); if (ht) ht.textContent = nm;
 
@@ -690,8 +701,9 @@ function updateNavBanner() {
     ['nav-gs','nav-agl','nav-dist','nav-brg','nav-eta'].forEach(id => { const e = $('#' + id); if (e) e.textContent = '--'; });
     $('#nav-ete').textContent = 'GPS?';
     const lb = $('#hsi-trk'); if (lb) lb.textContent = '---';
-    state.navData = { ete: 'GPS?' };
-    renderHsiWidgets();
+    state.navData = state.navData || {};
+    Object.assign(state.navData, { dist:null, crs:null, rmo:null, ete:'GPS?', eta:null, xtk:null, xtkSide:'' });
+    renderWidgets();
     if (state.gotoTarget) gotoLine.setLatLngs([]);
     return;
   }
@@ -727,20 +739,28 @@ function updateNavBanner() {
   if (!state.gotoTarget && dist < 0.5 && state.activeNavIdx < state.route.length - 1) { state.activeNavIdx++; state.navStart = null; }
 }
 
-/* ---------- Widgets do HSI (editáveis e arrastáveis) ---------- */
+/* ---------- Widgets editáveis/arrastáveis (HSI + HUD) ---------- */
 const HSI_METRICS = {
-  gs:{l:'GS',u:()=>uSpeed()}, dist:{l:'DIST',u:()=>uDist()}, crs:{l:'CURSO',u:()=>'°'},
-  rmo:{l:'RUMO',u:()=>'°'}, trk:{l:'PROA',u:()=>'°'}, agl:{l:'AGL',u:()=>uAlt()},
-  alt:{l:'ALT',u:()=>uAlt()}, ete:{l:'ETE',u:()=>''}, eta:{l:'ETA',u:()=>''}, xtk:{l:'DESVIO',u:()=>''},
-  vs:{l:'V.VERT',u:()=>state.cfg.altU === 'm' ? 'm/s' : 'fpm'}
+  gs:{l:'GS',u:()=>uSpeed()}, trk:{l:'PROA',u:()=>'°'}, alt:{l:'ALT',u:()=>uAlt()},
+  agl:{l:'AGL',u:()=>uAlt()}, vs:{l:'V.VERT',u:()=>state.cfg.altU === 'm' ? 'm/s' : 'fpm'},
+  dist:{l:'DIST',u:()=>uDist()}, crs:{l:'CURSO',u:()=>'°'}, rmo:{l:'RUMO',u:()=>'°'},
+  ete:{l:'ETE',u:()=>''}, eta:{l:'ETA',u:()=>''}, xtk:{l:'DESVIO',u:()=>''},
+  lat:{l:'LAT',u:()=>''}, lon:{l:'LON',u:()=>''}
 };
-const HSI_METRIC_ORDER = ['gs','dist','crs','rmo','trk','agl','alt','vs','ete','eta','xtk'];
+const HSI_METRIC_ORDER = ['gs','trk','alt','agl','vs','dist','crs','rmo','ete','eta','xtk','lat','lon'];
 const DEFAULT_HSI_WIDGETS = [
   {m:'gs',x:.13,y:.84},{m:'dist',x:.38,y:.84},{m:'crs',x:.63,y:.84},{m:'agl',x:.87,y:.84},
   {m:'ete',x:.2,y:.94},{m:'eta',x:.5,y:.94},{m:'xtk',x:.8,y:.94}
 ];
-function getHsiWidgets() { if (!state.hsiWidgets) state.hsiWidgets = JSON.parse(JSON.stringify(DEFAULT_HSI_WIDGETS)); return state.hsiWidgets; }
-function saveHsiWidgets() { LS.set('hsiWidgets', state.hsiWidgets); }
+const DEFAULT_HUD_WIDGETS = [
+  {m:'gs',x:.22,y:.05},{m:'trk',x:.5,y:.05},{m:'alt',x:.78,y:.05}
+];
+const WIDGET_LAYERS = {
+  hsiWidgets: { cont:'#hsi-widgets', bounds:'#hsi', def:DEFAULT_HSI_WIDGETS },
+  hudWidgets: { cont:'#hud-widgets', bounds:'#hud-widgets', def:DEFAULT_HUD_WIDGETS }
+};
+function getWidgets(list) { if (!state[list]) state[list] = JSON.parse(JSON.stringify(WIDGET_LAYERS[list].def)); return state[list]; }
+function saveWidgets(list) { LS.set(list, state[list]); }
 
 function metricStr(m) {
   const d = state.navData || {};
@@ -750,36 +770,38 @@ function metricStr(m) {
     trk: d.trk != null ? fmtDeg(d.trk) : '--', agl: d.agl != null ? Math.round(d.agl) : '--',
     alt: d.alt != null ? Math.round(d.alt) : '--', ete: d.ete || '--', eta: d.eta || '--',
     xtk: d.xtk != null ? d.xtk.toFixed(2) : '--',
-    vs: d.vs != null ? (state.cfg.altU === 'm' ? (d.vs * 0.00508).toFixed(1) : String(Math.round(d.vs / 10) * 10)) : '--'
+    vs: d.vs != null ? (state.cfg.altU === 'm' ? (d.vs * 0.00508).toFixed(1) : String(Math.round(d.vs / 10) * 10)) : '--',
+    lat: d.lat || '--', lon: d.lon || '--'
   };
   const unit = m === 'xtk' ? (d.xtkSide || '') : (HSI_METRICS[m] ? HSI_METRICS[m].u() : '');
   return [map[m] != null ? map[m] : '--', unit];
 }
 
-function buildHsiWidgets() {
-  const cont = $('#hsi-widgets'); if (!cont) return;
+function buildWidgets(list) {
+  const L = WIDGET_LAYERS[list], cont = $(L.cont); if (!cont) return;
   cont.innerHTML = '';
-  getHsiWidgets().forEach((w, i) => {
+  getWidgets(list).forEach((w, i) => {
     const el = document.createElement('div');
-    el.className = 'hsi-w'; el.dataset.i = i;
+    el.className = 'hsi-w'; el.dataset.i = i; el.dataset.list = list;
     el.style.left = (w.x * 100) + '%'; el.style.top = (w.y * 100) + '%';
     el.innerHTML = `<span class="hsi-w-l">${HSI_METRICS[w.m] ? HSI_METRICS[w.m].l : '?'}</span><b class="hsi-w-v">--</b><span class="hsi-w-u"></span>`;
-    attachWidget(el, i);
+    attachWidget(el, list, i);
     cont.appendChild(el);
   });
-  renderHsiWidgets();
+  renderWidgets();
 }
+function buildHsiWidgets() { buildWidgets('hsiWidgets'); buildWidgets('hudWidgets'); }
 
-function renderHsiWidgets() {
-  const cont = $('#hsi-widgets');
-  if (cont && state.hsiWidgets) cont.querySelectorAll('.hsi-w').forEach(el => {
-    const i = +el.dataset.i, w = state.hsiWidgets[i]; if (!w) return;
+function renderWidgets() {
+  document.querySelectorAll('.hsi-w').forEach(el => {
+    const list = el.dataset.list, i = +el.dataset.i, w = state[list] && state[list][i]; if (!w) return;
     const [v, u] = metricStr(w.m);
     el.querySelector('.hsi-w-v').textContent = v;
     el.querySelector('.hsi-w-u').textContent = u;
   });
   renderVsi();
 }
+const renderHsiWidgets = renderWidgets;
 
 // variômetro gráfico (barra de velocidade vertical)
 function renderVsi() {
@@ -797,7 +819,8 @@ function renderVsi() {
   }
 }
 
-function attachWidget(el, i) {
+function attachWidget(el, list, i) {
+  const boundsSel = WIDGET_LAYERS[list].bounds;
   let lp = null, dragMode = false, sx = 0, sy = 0, moved = false;
   el.addEventListener('pointerdown', e => {
     if (e.button != null && e.button !== 0) return;
@@ -809,23 +832,23 @@ function attachWidget(el, i) {
     if (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10) { moved = true; if (!dragMode) clearTimeout(lp); }
     if (!dragMode) return;
     e.preventDefault();
-    const r = $('#hsi').getBoundingClientRect();
-    const fx = Math.max(.06, Math.min(.94, (e.clientX - r.left) / r.width));
-    const fy = Math.max(.06, Math.min(.96, (e.clientY - r.top) / r.height));
-    state.hsiWidgets[i].x = fx; state.hsiWidgets[i].y = fy;
+    const r = $(boundsSel).getBoundingClientRect();
+    const fx = Math.max(.04, Math.min(.96, (e.clientX - r.left) / r.width));
+    const fy = Math.max(.03, Math.min(.97, (e.clientY - r.top) / r.height));
+    state[list][i].x = fx; state[list][i].y = fy;
     el.style.left = (fx * 100) + '%'; el.style.top = (fy * 100) + '%';
   });
   el.addEventListener('pointerup', e => {
     clearTimeout(lp);
     el.classList.remove('dragging');
-    if (dragMode && moved) saveHsiWidgets();    // arrastou
-    else if (!moved) { e.preventDefault(); openMetricPicker(i); }   // tocou → seletor
+    if (dragMode && moved) saveWidgets(list);    // arrastou
+    else if (!moved) { e.preventDefault(); openMetricPicker(list, i); }   // tocou → seletor
     dragMode = false;
   });
   el.addEventListener('pointercancel', () => { clearTimeout(lp); el.classList.remove('dragging'); dragMode = false; });
 }
 
-function openMetricPicker(i) {
+function openMetricPicker(list, i) {
   const isAdd = i === -1;
   const ov = document.createElement('div'); ov.className = 'picker-ov';
   let html = `<div class="picker"><h3>${isAdd ? 'Adicionar informação' : 'Escolher informação'}</h3><div class="picker-grid">`;
@@ -836,16 +859,15 @@ function openMetricPicker(i) {
   ov.innerHTML = html;
   document.body.appendChild(ov);
   const close = () => ov.remove();
-  // atrasa o fechar-no-fundo p/ o clique sintético do toque não fechar na hora
   setTimeout(() => ov.addEventListener('click', e => { if (e.target === ov) close(); }), 80);
   ov.querySelector('.picker-cancel').addEventListener('click', close);
   ov.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => {
-    if (isAdd) state.hsiWidgets.push({ m: b.dataset.m, x: .5, y: .55 });
-    else state.hsiWidgets[i].m = b.dataset.m;
-    saveHsiWidgets(); buildHsiWidgets(); close();
+    if (isAdd) state[list].push({ m: b.dataset.m, x: .5, y: list === 'hudWidgets' ? .14 : .55 });
+    else state[list][i].m = b.dataset.m;
+    saveWidgets(list); buildWidgets(list); close();
   }));
   const del = ov.querySelector('[data-del]');
-  if (del) del.addEventListener('click', () => { state.hsiWidgets.splice(i, 1); saveHsiWidgets(); buildHsiWidgets(); close(); });
+  if (del) del.addEventListener('click', () => { state[list].splice(i, 1); saveWidgets(list); buildWidgets(list); close(); });
 }
 
 /* ===================================================================
@@ -1326,7 +1348,8 @@ function wire() {
   $('#btnLayer').addEventListener('click', switchLayer);
   $('#navClose').addEventListener('click', clearGoto);
   $('#hsiClose').addEventListener('click', clearGoto);
-  $('#hsiAdd').addEventListener('click', () => openMetricPicker(-1));
+  $('#hsiAdd').addEventListener('click', () => openMetricPicker('hsiWidgets', -1));
+  { const ha = $('#hudAdd'); if (ha) ha.addEventListener('click', () => openMetricPicker('hudWidgets', -1)); }
   $('#legClose').addEventListener('click', () => { state.legendHidden = true; LS.set('legendHidden', true); renderAirportMarkers(); });
   $('#legRestore').addEventListener('click', () => { state.legendHidden = false; LS.set('legendHidden', false); renderAirportMarkers(); });
   $('#btnTrack').addEventListener('click', () => {

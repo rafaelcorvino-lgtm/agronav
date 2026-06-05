@@ -48,12 +48,9 @@
         <section class="page active" id="page-map">
             <div id="map"></div>
 
-            <!-- HUD: live flight data -->
-            <div class="hud" id="hud">
-                <div class="hud-item"><span class="hud-label">GS</span><span class="hud-val" id="hud-gs">--</span><span class="hud-unit" id="u-gs">kt</span></div>
-                <div class="hud-item"><span class="hud-label">TRK</span><span class="hud-val" id="hud-trk">--</span><span class="hud-unit">°</span></div>
-                <div class="hud-item"><span class="hud-label">ALT</span><span class="hud-val" id="hud-alt">--</span><span class="hud-unit" id="u-alt">ft</span></div>
-            </div>
+            <!-- HUD: campos selecionáveis/arrastáveis (igual ao HSI) -->
+            <div id="hud-widgets"></div>
+            <button class="hud-add" id="hudAdd" title="Adicionar informação"><i class="fas fa-plus"></i></button>
 
             <!-- GPS diagnóstico -->
             <div class="gps-info hidden" id="gpsInfo"></div>
