@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v40';
+const APP_VERSION = 'v41';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -146,8 +146,10 @@ function initMap() {
   map.on('moveend', renderAirportMarkers);
   // ao girar a tela, reposiciona o avião (HSI muda a área visível)
   window.addEventListener('resize', () => {
+    updateOrient();
     setTimeout(() => { if (map) map.invalidateSize({ animate: false }); if (state.followMode && state.pos) recenterFollow([state.pos.lat, state.pos.lon]); }, 150);
   });
+  updateOrient();
   drawRouteOnMap();
   drawFieldsOnMap();
 }
@@ -540,6 +542,11 @@ const PLANE_SVG =
   + '</svg>';
 
 function isPortrait() { return window.innerHeight >= window.innerWidth; }
+function updateOrient() {
+  const p = isPortrait();
+  document.body.classList.toggle('is-portrait', p);
+  document.body.classList.toggle('is-landscape', !p);
+}
 // recentra o mapa no avião; modo 2 (track-up) gira o mapa pela proa
 function recenterFollow(ll) {
   if (!map) return;
