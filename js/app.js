@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v44';
+const APP_VERSION = 'v45';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -829,7 +829,11 @@ function attachWidget(el, list, i) {
     lp = setTimeout(() => { dragMode = true; el.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(15); }, 380);
   });
   el.addEventListener('pointermove', e => {
-    if (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10) { moved = true; if (!dragMode) clearTimeout(lp); }
+    // mover o dedo já inicia o arrasto (não precisa esperar o long-press)
+    if (!dragMode && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) {
+      moved = true; clearTimeout(lp); dragMode = true; el.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(12);
+    }
     if (!dragMode) return;
     e.preventDefault();
     const r = $(boundsSel).getBoundingClientRect();
