@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v39';
+const APP_VERSION = 'v40';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
