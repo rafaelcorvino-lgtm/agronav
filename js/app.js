@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v45';
+const APP_VERSION = 'v46';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -821,35 +821,57 @@ function renderVsi() {
 
 function attachWidget(el, list, i) {
   const boundsSel = WIDGET_LAYERS[list].bounds;
-  let lp = null, dragMode = false, sx = 0, sy = 0, moved = false;
-  el.addEventListener('pointerdown', e => {
-    if (e.button != null && e.button !== 0) return;
-    try { el.setPointerCapture(e.pointerId); } catch (x) {}
-    sx = e.clientX; sy = e.clientY; moved = false; dragMode = false;
-    lp = setTimeout(() => { dragMode = true; el.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(15); }, 380);
-  });
-  el.addEventListener('pointermove', e => {
-    // mover o dedo já inicia o arrasto (não precisa esperar o long-press)
-    if (!dragMode && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) {
-      moved = true; clearTimeout(lp); dragMode = true; el.classList.add('dragging');
-      if (navigator.vibrate) navigator.vibrate(12);
+  let lp = null, dragMode = false, sx = 0, sy = 0, moved = false, pid = null;
+
+  // SEGURAR (long-press) p/ arrastar · TOCAR p/ trocar a informação.
+  // Os listeners de movimento ficam no document: assim o arrasto funciona mesmo
+  // passando o dedo POR CIMA DO MAPA (onde a captura de ponteiro do chip falha).
+  function onMove(e) {
+    if (pid !== null && e.pointerId !== pid) return;
+    if (!moved && (Math.abs(e.clientX - sx) > 12 || Math.abs(e.clientY - sy) > 12)) {
+      moved = true;
+      if (!dragMode) clearTimeout(lp);   // moveu antes de "armar" → trata como gesto/scroll, não arrasta
     }
     if (!dragMode) return;
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     const r = $(boundsSel).getBoundingClientRect();
     const fx = Math.max(.04, Math.min(.96, (e.clientX - r.left) / r.width));
     const fy = Math.max(.015, Math.min(.97, (e.clientY - r.top) / r.height));
     state[list][i].x = fx; state[list][i].y = fy;
     el.style.left = (fx * 100) + '%'; el.style.top = (fy * 100) + '%';
-  });
-  el.addEventListener('pointerup', e => {
+  }
+  function cleanup() {
     clearTimeout(lp);
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onCancel);
     el.classList.remove('dragging');
-    if (dragMode && moved) saveWidgets(list);    // arrastou
-    else if (!moved) { e.preventDefault(); openMetricPicker(list, i); }   // tocou → seletor
+    pid = null;
+  }
+  function onUp(e) {
+    if (pid !== null && e.pointerId !== pid) return;
+    const wasDrag = dragMode;
+    cleanup();
+    if (wasDrag) saveWidgets(list);                 // soltou após arrastar
+    else if (!moved) openMetricPicker(list, i);     // toque limpo → seletor
     dragMode = false;
+  }
+  function onCancel(e) {
+    if (pid !== null && e.pointerId !== pid) return;
+    cleanup(); dragMode = false;
+  }
+  el.addEventListener('pointerdown', e => {
+    if (e.button != null && e.button !== 0) return;
+    pid = e.pointerId; sx = e.clientX; sy = e.clientY; moved = false; dragMode = false;
+    document.addEventListener('pointermove', onMove, { passive: false });
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onCancel);
+    lp = setTimeout(() => {
+      if (moved) return;                            // já saiu do lugar → não arma arrasto
+      dragMode = true; el.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, 320);
   });
-  el.addEventListener('pointercancel', () => { clearTimeout(lp); el.classList.remove('dragging'); dragMode = false; });
 }
 
 function openMetricPicker(list, i) {
