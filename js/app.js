@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v41';
+const APP_VERSION = 'v42';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -798,16 +798,16 @@ function renderVsi() {
 }
 
 function attachWidget(el, i) {
-  let lp, dragging = false, sx, sy, moved;
+  let lp = null, dragMode = false, sx = 0, sy = 0, moved = false;
   el.addEventListener('pointerdown', e => {
     if (e.button != null && e.button !== 0) return;
     try { el.setPointerCapture(e.pointerId); } catch (x) {}
-    sx = e.clientX; sy = e.clientY; moved = false; dragging = false;
-    lp = setTimeout(() => { dragging = true; el.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(15); }, 280);
+    sx = e.clientX; sy = e.clientY; moved = false; dragMode = false;
+    lp = setTimeout(() => { dragMode = true; el.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(15); }, 380);
   });
   el.addEventListener('pointermove', e => {
-    if (Math.abs(e.clientX - sx) > 6 || Math.abs(e.clientY - sy) > 6) moved = true;
-    if (!dragging) return;
+    if (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10) { moved = true; if (!dragMode) clearTimeout(lp); }
+    if (!dragMode) return;
     e.preventDefault();
     const r = $('#hsi').getBoundingClientRect();
     const fx = Math.max(.06, Math.min(.94, (e.clientX - r.left) / r.width));
@@ -815,12 +815,14 @@ function attachWidget(el, i) {
     state.hsiWidgets[i].x = fx; state.hsiWidgets[i].y = fy;
     el.style.left = (fx * 100) + '%'; el.style.top = (fy * 100) + '%';
   });
-  el.addEventListener('pointerup', () => {
+  el.addEventListener('pointerup', e => {
     clearTimeout(lp);
-    if (dragging) { dragging = false; el.classList.remove('dragging'); saveHsiWidgets(); }
-    else if (!moved) openMetricPicker(i);
+    el.classList.remove('dragging');
+    if (dragMode && moved) saveHsiWidgets();    // arrastou
+    else if (!moved) { e.preventDefault(); openMetricPicker(i); }   // tocou → seletor
+    dragMode = false;
   });
-  el.addEventListener('pointercancel', () => { clearTimeout(lp); dragging = false; el.classList.remove('dragging'); });
+  el.addEventListener('pointercancel', () => { clearTimeout(lp); el.classList.remove('dragging'); dragMode = false; });
 }
 
 function openMetricPicker(i) {
@@ -834,7 +836,8 @@ function openMetricPicker(i) {
   ov.innerHTML = html;
   document.body.appendChild(ov);
   const close = () => ov.remove();
-  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  // atrasa o fechar-no-fundo p/ o clique sintético do toque não fechar na hora
+  setTimeout(() => ov.addEventListener('click', e => { if (e.target === ov) close(); }), 80);
   ov.querySelector('.picker-cancel').addEventListener('click', close);
   ov.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => {
     if (isAdd) state.hsiWidgets.push({ m: b.dataset.m, x: .5, y: .55 });
