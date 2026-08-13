@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v48';
+const APP_VERSION = 'v49';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -289,6 +289,7 @@ const ASP_LABEL = {
   CTR: 'Zona de Controle (CTR)', TMA: 'Terminal (TMA)', CTA: 'Área de Controle (CTA)',
   CTA_P: 'Área de Controle', P: 'Área PROIBIDA (P)', R: 'Área RESTRITA (R)', D: 'Área PERIGOSA (D)'
 };
+const ASP_PRIORITY = { CTA: 0, CTA_P: 0, TMA: 1, CTR: 2, D: 3, R: 4, P: 5 };
 function aspStyle(f) {
   const s = ASP_STYLE[f.properties.t] || { color: '#94a3b8', fill: .06, w: 1.2 };
   return { color: s.color, weight: s.w, fillColor: s.color, fillOpacity: s.fill, opacity: .9 };
@@ -304,6 +305,10 @@ function loadAirspace() {
   fetch('data/br-airspace.json', { cache: 'force-cache' })
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(geo => {
+      if (geo && Array.isArray(geo.features)) {
+        // áreas mais específicas (P/R/D) por cima das genéricas (CTR/TMA/CTA) p/ clique pegar a certa quando sobrepostas
+        geo.features.sort((a, b) => (ASP_PRIORITY[a.properties.t] || 0) - (ASP_PRIORITY[b.properties.t] || 0));
+      }
       aspRenderer = L.canvas({ padding: 0.5 });
       airspaceLayer = L.geoJSON(geo, {
         renderer: aspRenderer,
