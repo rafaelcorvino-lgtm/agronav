@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v46';
+const APP_VERSION = 'v47';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -560,7 +560,7 @@ function updateOrient() {
 // recentra o mapa no avião; modo 2 (track-up) gira o mapa pela proa
 function recenterFollow(ll) {
   if (!map) return;
-  const z = Math.max(map.getZoom(), 12);
+  const z = map.getZoom();          // mantém o zoom escolhido pelo piloto (sem zoom automático)
   if (map.setBearing) {
     if (state.followMode === 2) {
       // proa pra cima: usa o rumo (já vem só com movimento real do onPos)
