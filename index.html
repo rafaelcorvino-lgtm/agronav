@@ -31,6 +31,7 @@
             <li class="nav-item" data-page="e6b"><i class="fas fa-calculator"></i><span>E6B</span></li>
             <li class="nav-item" data-page="fields"><i class="fas fa-seedling"></i><span>Talhões</span></li>
             <li class="nav-item" data-page="aero"><i class="fas fa-tower-control"></i><span>Aeródromos</span></li>
+            <li class="nav-item" data-page="pedidos"><i class="fas fa-comment-dots"></i><span>Pedidos</span></li>
             <li class="nav-item" data-page="settings"><i class="fas fa-gear"></i><span>Configurações</span></li>
         </ul>
         <div class="sidebar-footer">
@@ -363,6 +364,30 @@
                 <div class="card">
                     <div class="card-head"><h3>Sobre</h3></div>
                     <p class="about">Nave Corvino — assistente de navegação para aviação agrícola. Dados ficam no seu dispositivo (localStorage). <strong>Use apenas como apoio</strong>; não substitui cartas oficiais, GPS certificado nem planejamento formal. Aeródromos (OurAirports) e espaços aéreos (DECEA/GEOAISWEB) são para referência — confira AIP/NOTAM/cartas oficiais antes do voo.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- PEDIDOS: chat de mudanças do app -->
+        <section class="page" id="page-pedidos">
+            <div class="page-header"><h1><i class="fas fa-comment-dots"></i> Pedidos de mudança</h1></div>
+            <div class="content">
+                <div class="card">
+                    <p class="hint">Escreva aqui tudo que você quer mudar ou adicionar no app. Cada mensagem fica salva. Quando quiser, toque em <b>Enviar ao Claude</b> — o Claude lê e atualiza o app.</p>
+                    <div class="ped-list" id="pedList"></div>
+                    <div class="ped-compose">
+                        <textarea id="pedInput" rows="2" placeholder="Ex: aumentar a letra do campo GS no mapa"></textarea>
+                        <button class="btn btn-primary ped-add-btn" id="pedAdd" title="Adicionar pedido"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                    <div class="card-actions wrap">
+                        <button class="btn btn-primary" id="pedSend"><i class="fab fa-github"></i> Enviar ao Claude</button>
+                        <button class="btn btn-ghost" id="pedCopy"><i class="fas fa-copy"></i> Copiar tudo</button>
+                        <button class="btn btn-ghost danger" id="pedClear"><i class="fas fa-trash-can"></i> Limpar enviados</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3><i class="fas fa-circle-info"></i> Como funciona</h3></div>
+                    <p class="about"><b>Enviar ao Claude</b> abre uma página do GitHub já preenchida com seus pedidos pendentes — é só tocar em <b>“Submit new issue”</b>. Assim eles chegam pra mim (e para a atualização automática diária). Sem GitHub? Use <b>Copiar tudo</b> e cole numa conversa comigo.</p>
                 </div>
             </div>
         </section>

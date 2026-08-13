@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v47';
+const APP_VERSION = 'v48';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -37,6 +37,7 @@ const state = {
   showAirspace: LS.get('showAirspace', false),
   hsiWidgets: LS.get('hsiWidgets', null),
   hudWidgets: LS.get('hudWidgets', null),
+  pedidos: LS.get('pedidos', []),
   navData: {}
 };
 
@@ -106,6 +107,7 @@ function showPage(name) {
   if (name === 'route') renderRoute();
   if (name === 'fields') renderFields();
   if (name === 'aero') renderAero();
+  if (name === 'pedidos') renderPedidos();
 }
 $$('.nav-item').forEach(n => n.addEventListener('click', () => showPage(n.dataset.page)));
 
@@ -897,6 +899,71 @@ function openMetricPicker(list, i) {
 }
 
 /* ===================================================================
+   PEDIDOS — chat de mudanças do app (envia p/ GitHub Issues)
+   =================================================================== */
+const PED_REPO = 'rafaelcorvino-lgtm/agronav';
+
+function savePedidos() { LS.set('pedidos', state.pedidos); }
+
+function renderPedidos() {
+  const box = $('#pedList'); if (!box) return;
+  if (!state.pedidos.length) {
+    box.innerHTML = '<p class="ped-empty">Nenhum pedido ainda. Escreva abaixo o que você quer mudar. 👇</p>';
+    return;
+  }
+  box.innerHTML = '';
+  state.pedidos.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'ped-msg' + (p.sent ? ' sent' : '');
+    el.innerHTML =
+      `<div class="ped-text"></div>` +
+      `<div class="ped-meta"><span class="ped-status">${p.sent ? '<i class="fas fa-check"></i> enviado' : 'pendente'}</span>` +
+      `<button class="ped-del" title="Apagar"><i class="fas fa-xmark"></i></button></div>`;
+    el.querySelector('.ped-text').textContent = p.text;
+    el.querySelector('.ped-del').addEventListener('click', () => {
+      state.pedidos = state.pedidos.filter(x => x.id !== p.id); savePedidos(); renderPedidos();
+    });
+    box.appendChild(el);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
+function addPedido() {
+  const inp = $('#pedInput'); if (!inp) return;
+  const text = inp.value.trim(); if (!text) return;
+  state.pedidos.push({ id: Date.now(), text, sent: false });
+  savePedidos(); inp.value = ''; renderPedidos();
+}
+
+function sendPedidos() {
+  const pend = state.pedidos.filter(p => !p.sent);
+  if (!pend.length) { toast('Nenhum pedido pendente para enviar'); return; }
+  const d = new Date();
+  const title = `Pedidos do app — ${d.toLocaleDateString('pt-BR')}`;
+  const body = pend.map(p => `- [ ] ${p.text}`).join('\n');
+  const url = `https://github.com/${PED_REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  window.open(url, '_blank');
+  pend.forEach(p => p.sent = true); savePedidos(); renderPedidos();
+  toast('Abrindo o GitHub — toque em "Submit new issue" para enviar');
+}
+
+function copyPedidos() {
+  if (!state.pedidos.length) { toast('Nada para copiar'); return; }
+  const txt = state.pedidos.map(p => '- ' + p.text).join('\n');
+  const done = () => toast('Pedidos copiados');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(() => { prompt('Copie os pedidos:', txt); });
+  } else { prompt('Copie os pedidos:', txt); }
+}
+
+function clearSentPedidos() {
+  const n = state.pedidos.filter(p => p.sent).length;
+  if (!n) { toast('Nenhum enviado para limpar'); return; }
+  state.pedidos = state.pedidos.filter(p => !p.sent); savePedidos(); renderPedidos();
+  toast(n + ' enviado(s) removido(s)');
+}
+
+/* ===================================================================
    WAYPOINTS / ROUTE
    =================================================================== */
 function addWaypoint(wp) {
@@ -1376,6 +1443,12 @@ function wire() {
   $('#hsiClose').addEventListener('click', clearGoto);
   $('#hsiAdd').addEventListener('click', () => openMetricPicker('hsiWidgets', -1));
   { const ha = $('#hudAdd'); if (ha) ha.addEventListener('click', () => openMetricPicker('hudWidgets', -1)); }
+  // Pedidos (chat de mudanças)
+  $('#pedAdd').addEventListener('click', addPedido);
+  $('#pedInput').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addPedido(); } });
+  $('#pedSend').addEventListener('click', sendPedidos);
+  $('#pedCopy').addEventListener('click', copyPedidos);
+  $('#pedClear').addEventListener('click', clearSentPedidos);
   $('#legClose').addEventListener('click', () => { state.legendHidden = true; LS.set('legendHidden', true); renderAirportMarkers(); });
   $('#legRestore').addEventListener('click', () => { state.legendHidden = false; LS.set('legendHidden', false); renderAirportMarkers(); });
   $('#btnTrack').addEventListener('click', () => {
