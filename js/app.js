@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v48';
+const APP_VERSION = 'v49';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -931,8 +931,61 @@ function renderPedidos() {
 function addPedido() {
   const inp = $('#pedInput'); if (!inp) return;
   const text = inp.value.trim(); if (!text) return;
-  state.pedidos.push({ id: Date.now(), text, sent: false });
+  const id = Date.now();
+  state.pedidos.push({ id, text, sent: false, cloud: false });
   savePedidos(); inp.value = ''; renderPedidos();
+  pushPedidoCloud(text, id);              // sobe pra nuvem (Claude lê direto)
+  toast(pedRtdb ? 'Pedido enviado ✔' : 'Pedido salvo (sobe ao reconectar)');
+}
+
+/* ---- Nuvem dos pedidos (Firebase RTDB, grupo compartilhado) ---- */
+const NAVE_GROUP = 'nave-corvino';
+let pedRtdb = null;
+function pedDevId() { let d = LS.get('devid', null); if (!d) { d = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); LS.set('devid', d); } return d; }
+function initPedCloud() {
+  try {
+    if (typeof firebase === 'undefined' || !window.firebaseConfig) return;
+    firebase.initializeApp(window.firebaseConfig);
+    pedRtdb = firebase.database();
+    pedRtdb.ref('grupos/' + NAVE_GROUP + '/chatlog').on('value', snap => renderPedHist(snap.val() || {}));
+    pedRtdb.ref('.info/connected').on('value', s => { if (s.val()) flushPedidosCloud(); });
+  } catch (e) { /* offline: segue local */ }
+}
+function pushPedidoCloud(text, localId) {
+  if (!pedRtdb) return;
+  try {
+    pedRtdb.ref('grupos/' + NAVE_GROUP + '/chatlog').push({
+      type: 'pedido', text: text, done: false, ver: APP_VERSION,
+      ts: Date.now(), when: new Date().toISOString().slice(0, 19).replace('T', ' '), dev: pedDevId(), localId: localId || null
+    }).then(() => { const p = state.pedidos.find(x => x.id === localId); if (p) { p.cloud = true; savePedidos(); } }).catch(() => {});
+  } catch (_) {}
+}
+function flushPedidosCloud() { if (pedRtdb) state.pedidos.filter(p => !p.cloud).forEach(p => pushPedidoCloud(p.text, p.id)); }
+function reloadPedHist() { if (pedRtdb) pedRtdb.ref('grupos/' + NAVE_GROUP + '/chatlog').get().then(s => renderPedHist(s.val() || {})).catch(() => {}); }
+function renderPedHist(data) {
+  const box = $('#pedHist'); if (!box) return;
+  const items = Object.values(data || {}).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  if (!items.length) { box.innerHTML = '<p class="ped-empty">Sem histórico ainda. Seus pedidos e as respostas do Claude aparecem aqui.</p>'; return; }
+  box.innerHTML = '';
+  items.forEach(it => {
+    const el = document.createElement('div');
+    const body = document.createElement('div'); body.className = 'ph-body';
+    const when = document.createElement('div'); when.className = 'ph-when';
+    if (it.type === 'update') {
+      el.className = 'ped-hist upd';
+      const h = document.createElement('div'); h.className = 'ph-head';
+      h.innerHTML = '<i class="fas fa-wrench"></i> '; h.appendChild(document.createTextNode('Atualização' + (it.ver ? ' — ' + it.ver : '')));
+      body.textContent = it.changes || ''; when.textContent = it.when || '';
+      el.appendChild(h); el.appendChild(body); el.appendChild(when);
+    } else {
+      el.className = 'ped-hist' + (it.done ? ' done' : '');
+      body.textContent = '📝 ' + (it.text || it.q || '');
+      when.textContent = (it.done ? '✓ feito · ' : '') + (it.when || '');
+      el.appendChild(body); el.appendChild(when);
+    }
+    box.appendChild(el);
+  });
+  box.scrollTop = box.scrollHeight;
 }
 
 function sendPedidos() {
@@ -1449,6 +1502,7 @@ function wire() {
   $('#pedSend').addEventListener('click', sendPedidos);
   $('#pedCopy').addEventListener('click', copyPedidos);
   $('#pedClear').addEventListener('click', clearSentPedidos);
+  const phr = $('#pedHistReload'); if (phr) phr.addEventListener('click', reloadPedHist);
   $('#legClose').addEventListener('click', () => { state.legendHidden = true; LS.set('legendHidden', true); renderAirportMarkers(); });
   $('#legRestore').addEventListener('click', () => { state.legendHidden = false; LS.set('legendHidden', false); renderAirportMarkers(); });
   $('#btnTrack').addEventListener('click', () => {
@@ -1563,6 +1617,7 @@ function init() {
   calcWindTriangle(); calcRunwayWind(); calcTSD(); calcDensityAlt(); calcConvert();
   // GPS automático ao abrir
   if (state.watchId === null) toggleGPS();
+  initPedCloud();                     // nuvem dos pedidos (Firebase)
 }
 document.addEventListener('DOMContentLoaded', init);
 
