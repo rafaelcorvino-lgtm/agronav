@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v53';
+const APP_VERSION = 'v54';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -267,7 +267,8 @@ function renderAirportMarkers() {
     } else {
       // ícone de pista inclinada (orientação real ou deduzida do número) + cabeceiras; senão tracinho
       const icon = (rws && rws.length) ? runwayIcon(a, rws, z >= GLYPH_ID_ZOOM) : aptSymbol(a);
-      const m = L.marker([a.lat, a.lon], { icon });
+      const c = aptCoord(a);
+      const m = L.marker([c.lat, c.lon], { icon });
       m.bindTooltip(a.icao, { direction: 'top', offset: [0, -6] });
       m.bindPopup(() => airportPopup(a), { minWidth: 200 });
       airportGroup.addLayer(m);
@@ -350,7 +351,8 @@ function airportPopup(a) {
     </div>`;
   div.querySelector('.apt-goto').addEventListener('click', () => { directTo(a); map.closePopup(); });
   div.querySelector('.apt-add').addEventListener('click', () => {
-    addWaypoint({ name: a.icao, lat: a.lat, lon: a.lon });
+    const c = aptCoord(a);
+    addWaypoint({ name: a.icao, lat: c.lat, lon: c.lon });
     toast(a.icao + ' adicionado à rota'); map.closePopup();
   });
   return div;
@@ -358,7 +360,8 @@ function airportPopup(a) {
 
 /* ---------- Navegação direta (Direct-To) ---------- */
 function directTo(a) {
-  state.gotoTarget = { name: a.icao || a.name, lat: a.lat, lon: a.lon };
+  const c = (a.icao && RUNWAYS && RUNWAYS.get) ? aptCoord(a) : { lat: a.lat, lon: a.lon };
+  state.gotoTarget = { name: a.icao || a.name, lat: c.lat, lon: c.lon };
   state.navStart = state.pos ? { lat: state.pos.lat, lon: state.pos.lon } : null;
   updateNavBanner();
   if (state.watchId === null) toast('Navegando até ' + state.gotoTarget.name + ' — ative o GPS p/ dados ao vivo');
@@ -1331,11 +1334,29 @@ function buildAirportIndex(brData) {
     const [icao, name, city, uf, lat, lon, elev, t, s] = r;
     AIRPORT_MAP.set(icao, { icao, name, city, uf, lat, lon, elev, t, s });
   });
-  // 2) base local rica: adiciona/sobrepõe pista + frequência
+  // 2) base local rica: só ENRIQUECE (pista/freq/elev). NÃO sobrepõe coordenadas —
+  //    a OurAirports é a fonte da posição (bate com a pista/satélite). Vários ICAO da base
+  //    local estavam com coordenadas antigas/trocadas (ex.: SWPI, SWLD) e plotavam errado.
   AERODROMES.forEach(a => {
-    const ex = AIRPORT_MAP.get(a.icao) || {};
-    AIRPORT_MAP.set(a.icao, Object.assign({}, ex, a));
+    const ex = AIRPORT_MAP.get(a.icao);
+    if (ex) {
+      if (a.rwy != null) ex.rwy = a.rwy;
+      if (a.freq != null) ex.freq = a.freq;
+      if (ex.elev == null && a.elev != null) ex.elev = a.elev;
+    } else {
+      AIRPORT_MAP.set(a.icao, Object.assign({}, a));   // não está na base ampla: usa a local
+    }
   });
+}
+// posição do aeródromo p/ plotar/navegar: meio da pista real (bate com satélite) se houver; senão o ponto do aeródromo
+function aptCoord(a) {
+  const rws = RUNWAYS && RUNWAYS.get && RUNWAYS.get(a.icao);
+  if (rws && rws.length) {
+    const r = rws[0];
+    const lat = (r[0] + r[2]) / 2, lon = (r[1] + r[3]) / 2;
+    if (isFinite(lat) && isFinite(lon)) return { lat, lon };
+  }
+  return { lat: a.lat, lon: a.lon };
 }
 
 function loadAirportsOnline() {
@@ -1392,17 +1413,19 @@ function renderAero(filter) {
     const a = findAirport(b.dataset.map); if (!a) return;
     showPage('map');
     setTimeout(() => {
-      map.setView([a.lat, a.lon], 13);
+      const c = aptCoord(a);
+      map.setView([c.lat, c.lon], 13);
       let html = `<b>${a.icao}</b> — ${a.name}<br>${a.city || ''}${a.uf ? '/' + a.uf : ''}`;
       if (a.elev != null) html += `<br>Elev ${a.elev} ft`;
       if (a.rwy) html += ` · Pista ${a.rwy}`;
       if (a.freq) html += `<br>Freq ${a.freq.toFixed(2)}`;
-      L.popup().setLatLng([a.lat, a.lon]).setContent(html).openOn(map);
+      L.popup().setLatLng([c.lat, c.lon]).setContent(html).openOn(map);
     }, 120);
   }));
   tb.querySelectorAll('[data-route]').forEach(b => b.addEventListener('click', () => {
     const a = findAirport(b.dataset.route); if (!a) return;
-    addWaypoint({ name: a.icao, lat: a.lat, lon: a.lon });
+    const c = aptCoord(a);
+    addWaypoint({ name: a.icao, lat: c.lat, lon: c.lon });
     toast(a.icao + ' adicionado à rota');
   }));
 }
