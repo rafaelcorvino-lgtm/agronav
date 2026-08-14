@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v50';
+const APP_VERSION = 'v51';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -919,10 +919,10 @@ function renderPedidos() {
   box.innerHTML = '';
   state.pedidos.forEach(p => {
     const el = document.createElement('div');
-    el.className = 'ped-msg' + (p.sent ? ' sent' : '');
+    el.className = 'ped-msg' + (p.cloud ? ' sent' : '');
     el.innerHTML =
       `<div class="ped-text"></div>` +
-      `<div class="ped-meta"><span class="ped-status">${p.sent ? '<i class="fas fa-check"></i> enviado' : 'pendente'}</span>` +
+      `<div class="ped-meta"><span class="ped-status">${p.cloud ? '<i class="fas fa-check"></i> enviado' : '<i class="fas fa-clock"></i> enviando…'}</span>` +
       `<button class="ped-del" title="Apagar"><i class="fas fa-xmark"></i></button></div>`;
     el.querySelector('.ped-text').textContent = p.text;
     el.querySelector('.ped-del').addEventListener('click', () => {
@@ -993,18 +993,6 @@ function renderPedHist(data) {
   box.scrollTop = box.scrollHeight;
 }
 
-function sendPedidos() {
-  const pend = state.pedidos.filter(p => !p.sent);
-  if (!pend.length) { toast('Nenhum pedido pendente para enviar'); return; }
-  const d = new Date();
-  const title = `Pedidos do app — ${d.toLocaleDateString('pt-BR')}`;
-  const body = pend.map(p => `- [ ] ${p.text}`).join('\n');
-  const url = `https://github.com/${PED_REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
-  window.open(url, '_blank');
-  pend.forEach(p => p.sent = true); savePedidos(); renderPedidos();
-  toast('Abrindo o GitHub — toque em "Submit new issue" para enviar');
-}
-
 function copyPedidos() {
   if (!state.pedidos.length) { toast('Nada para copiar'); return; }
   const txt = state.pedidos.map(p => '- ' + p.text).join('\n');
@@ -1015,10 +1003,10 @@ function copyPedidos() {
 }
 
 function clearSentPedidos() {
-  const n = state.pedidos.filter(p => p.sent).length;
+  const n = state.pedidos.filter(p => p.cloud).length;
   if (!n) { toast('Nenhum enviado para limpar'); return; }
-  state.pedidos = state.pedidos.filter(p => !p.sent); savePedidos(); renderPedidos();
-  toast(n + ' enviado(s) removido(s)');
+  state.pedidos = state.pedidos.filter(p => !p.cloud); savePedidos(); renderPedidos();
+  toast(n + ' enviado(s) removido(s) desta tela (o Claude ainda os vê na nuvem)');
 }
 
 /* ===================================================================
@@ -1504,7 +1492,6 @@ function wire() {
   // Pedidos (chat de mudanças)
   $('#pedAdd').addEventListener('click', addPedido);
   $('#pedInput').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addPedido(); } });
-  $('#pedSend').addEventListener('click', sendPedidos);
   $('#pedCopy').addEventListener('click', copyPedidos);
   $('#pedClear').addEventListener('click', clearSentPedidos);
   const phr = $('#pedHistReload'); if (phr) phr.addEventListener('click', reloadPedHist);

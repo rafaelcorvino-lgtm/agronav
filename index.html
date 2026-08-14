@@ -373,14 +373,13 @@
             <div class="page-header"><h1><i class="fas fa-comment-dots"></i> Pedidos de mudança</h1></div>
             <div class="content">
                 <div class="card">
-                    <p class="hint">Escreva aqui tudo que você quer mudar ou adicionar no app. Cada mensagem fica salva. Quando quiser, toque em <b>Enviar ao Claude</b> — o Claude lê e atualiza o app.</p>
+                    <p class="hint">Escreva aqui tudo que você quer mudar ou adicionar no app. Cada pedido é enviado automaticamente — o Claude lê e atualiza o app.</p>
                     <div class="ped-list" id="pedList"></div>
                     <div class="ped-compose">
                         <textarea id="pedInput" rows="2" placeholder="Ex: aumentar a letra do campo GS no mapa"></textarea>
                         <button class="btn btn-primary ped-add-btn" id="pedAdd" title="Adicionar pedido"><i class="fas fa-paper-plane"></i></button>
                     </div>
                     <div class="card-actions wrap">
-                        <button class="btn btn-primary" id="pedSend"><i class="fab fa-github"></i> Enviar ao Claude</button>
                         <button class="btn btn-ghost" id="pedCopy"><i class="fas fa-copy"></i> Copiar tudo</button>
                         <button class="btn btn-ghost danger" id="pedClear"><i class="fas fa-trash-can"></i> Limpar enviados</button>
                     </div>
@@ -391,7 +390,7 @@
                 </div>
                 <div class="card">
                     <div class="card-head"><h3><i class="fas fa-circle-info"></i> Como funciona</h3></div>
-                    <p class="about">Ao enviar um pedido, ele vai pra nuvem e o Claude lê direto — depois ele responde aqui no <b>Histórico</b> o que mudou e em qual versão. O botão <b>Enviar ao Claude</b> (GitHub) continua disponível como alternativa. Sem internet, o pedido fica salvo e sobe sozinho ao reconectar.</p>
+                    <p class="about">Cada pedido vai pra nuvem e o Claude lê direto — depois ele responde aqui no <b>Histórico</b> o que mudou e em qual versão. Sem internet, o pedido fica salvo e sobe sozinho ao reconectar.</p>
                 </div>
             </div>
         </section>
