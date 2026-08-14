@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v55';
+const APP_VERSION = 'v56';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -109,7 +109,7 @@ function showPage(name) {
   if (name === 'route') { renderRoute(); renderPlaces(); }
   if (name === 'fields') renderFields();
   if (name === 'aero') renderAero();
-  if (name === 'pedidos') renderPedidos();
+  if (name === 'pedidos') { renderPedidos(); renderPedLog(); }
 }
 $$('.nav-item').forEach(n => n.addEventListener('click', () => showPage(n.dataset.page)));
 
@@ -1048,6 +1048,32 @@ function clearSentPedidos() {
   toast(n + ' enviado(s) removido(s) desta tela (o Claude ainda os vê na nuvem)');
 }
 
+/* ---- Log do app (changelog local, lido do PEDIDOS.md — sem precisar abrir o Github) ---- */
+function renderPedLog() {
+  const box = $('#pedLog'); if (!box) return;
+  fetch('./PEDIDOS.md').then(r => r.text()).then(md => {
+    const feito = md.split(/^## Feito\s*$/m)[1] || '';
+    const items = feito.split('\n')
+      .map(l => l.match(/^- \[x\]\s*(.+)$/))
+      .filter(Boolean)
+      .map(m => m[1].trim())
+      .reverse();
+    if (!items.length) { box.innerHTML = '<p class="ped-empty">Sem log ainda.</p>'; return; }
+    box.innerHTML = '';
+    items.forEach(text => {
+      const verMatch = text.match(/—\s*(v\d+)\s*$/);
+      const ver = verMatch ? verMatch[1] : '';
+      const desc = verMatch ? text.slice(0, verMatch.index).replace(/—\s*$/, '').trim() : text;
+      const el = document.createElement('div'); el.className = 'ped-hist upd';
+      const h = document.createElement('div'); h.className = 'ph-head';
+      h.innerHTML = '<i class="fas fa-wrench"></i> '; h.appendChild(document.createTextNode('Atualização' + (ver ? ' — ' + ver : '')));
+      const body = document.createElement('div'); body.className = 'ph-body'; body.textContent = desc;
+      el.appendChild(h); el.appendChild(body);
+      box.appendChild(el);
+    });
+  }).catch(() => { box.innerHTML = '<p class="ped-empty">Não foi possível carregar o log agora.</p>'; });
+}
+
 /* ===================================================================
    WAYPOINTS / ROUTE
    =================================================================== */
@@ -1672,6 +1698,7 @@ function wire() {
   $('#pedCopy').addEventListener('click', copyPedidos);
   $('#pedClear').addEventListener('click', clearSentPedidos);
   const phr = $('#pedHistReload'); if (phr) phr.addEventListener('click', reloadPedHist);
+  const plr = $('#pedLogReload'); if (plr) plr.addEventListener('click', renderPedLog);
   $('#legClose').addEventListener('click', () => { state.legendHidden = true; LS.set('legendHidden', true); renderAirportMarkers(); });
   $('#legRestore').addEventListener('click', () => { state.legendHidden = false; LS.set('legendHidden', false); renderAirportMarkers(); });
   $('#btnTrack').addEventListener('click', () => {

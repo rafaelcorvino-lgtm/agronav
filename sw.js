@@ -4,7 +4,7 @@
      quando há internet; cai pro cache só offline. (evita ficar preso em versão velha)
    - Recursos externos (tiles do mapa, Leaflet, FontAwesome): CACHE PRIMEIRO → rápido e
      funciona offline depois da 1ª visita. */
-const CACHE = 'agronav-v55';
+const CACHE = 'agronav-v56';
 const SHELL = [
   './',
   './index.html',
@@ -15,6 +15,7 @@ const SHELL = [
   './data/br-airports.json',
   './data/br-runways.json',
   './data/br-airspace.json',
+  './PEDIDOS.md',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
