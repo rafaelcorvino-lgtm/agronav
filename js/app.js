@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v54';
+const APP_VERSION = 'v55';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -21,6 +21,7 @@ const state = {
   savedRoutes: LS.get('savedRoutes', []),
   fields: LS.get('fields', []),        // [{id, name, coords:[[lat,lon]...], area}]
   places: LS.get('places', []),        // [{id, name, lat, lon}] pistas/pontos fixos (independentes da rota)
+  aptFix: LS.get('aptFix', {}),        // { ICAO: {lat, lon} } correções de posição de aeródromos (dado da fonte errado)
   followMode: 1,   // 0=livre, 1=norte acima (seguir), 2=proa acima (track-up)
   curBearing: 0,
   tracking: false,
@@ -250,8 +251,10 @@ function renderAirportMarkers() {
       // zoom perto + geometria REAL: pista geográfica (orientação e comprimento exatos) + cabeceiras
       const w = RWY_W[a.t] || 4;
       const showIds = z >= RWYID_ZOOM;
+      const off = aptOffset(a);           // move a pista junto se houver correção manual
       rws.filter(r => r[8] === 1).forEach(rw => {
-        const pts = [[rw[0], rw[1]], [rw[2], rw[3]]];
+        const le = [rw[0] + off.dlat, rw[1] + off.dlon], he = [rw[2] + off.dlat, rw[3] + off.dlon];
+        const pts = [le, he];
         const casing = L.polyline(pts, { color: '#0b1219', weight: w + 3, opacity: .85, lineCap: 'butt' });
         const top = L.polyline(pts, { color: surfColor(rw[4]), weight: w, opacity: 1, lineCap: 'butt' });
         [casing, top].forEach(l => {
@@ -260,8 +263,8 @@ function renderAirportMarkers() {
           airportGroup.addLayer(l);
         });
         if (showIds) {
-          if (rw[6]) airportGroup.addLayer(rwyLabel([rw[0], rw[1]], rw[6]));
-          if (rw[7]) airportGroup.addLayer(rwyLabel([rw[2], rw[3]], rw[7]));
+          if (rw[6]) airportGroup.addLayer(rwyLabel(le, rw[6]));
+          if (rw[7]) airportGroup.addLayer(rwyLabel(he, rw[7]));
         }
       });
     } else {
@@ -344,10 +347,14 @@ function airportPopup(a) {
   else if (a.s && SURF_LABEL[a.s]) bits.push(`Piso ${SURF_LABEL[a.s]}`);
   if (a.freq) bits.push(`Freq ${a.freq.toFixed(2)}`);
   if (bits.length) info += `<br><span class="apt-meta">${bits.join(' · ')}</span>`;
+  const fixed = !!aptFixGet(a.icao);
+  if (fixed) info += `<br><span class="apt-meta" style="color:var(--accent-orange)"><i class="fas fa-crosshairs"></i> posição corrigida por você</span>`;
   div.innerHTML = `<div class="apt-info">${info}</div>
     <div class="apt-actions">
       <button class="btn btn-primary apt-goto"><i class="fas fa-diamond-turn-right"></i> Navegar até</button>
       <button class="btn btn-ghost apt-add"><i class="fas fa-plus"></i> Rota</button>
+      <button class="btn btn-ghost apt-fix" title="Mover para o lugar certo"><i class="fas fa-crosshairs"></i> Corrigir posição</button>
+      ${fixed ? '<button class="btn btn-ghost danger apt-unfix" title="Voltar ao dado original"><i class="fas fa-rotate-left"></i></button>' : ''}
     </div>`;
   div.querySelector('.apt-goto').addEventListener('click', () => { directTo(a); map.closePopup(); });
   div.querySelector('.apt-add').addEventListener('click', () => {
@@ -355,7 +362,32 @@ function airportPopup(a) {
     addWaypoint({ name: a.icao, lat: c.lat, lon: c.lon });
     toast(a.icao + ' adicionado à rota'); map.closePopup();
   });
+  div.querySelector('.apt-fix').addEventListener('click', () => { map.closePopup(); startAptFix(a.icao); });
+  const unfix = div.querySelector('.apt-unfix');
+  if (unfix) unfix.addEventListener('click', () => { map.closePopup(); removeAptFix(a.icao); });
   return div;
+}
+
+/* ---------- Corrigir posição de aeródromo (dado da fonte errado) ---------- */
+let fixingApt = null;
+function startAptFix(icao) {
+  fixingApt = icao;
+  const bar = $('#aptFixBar'); if (bar) { $('#aptFixWho').textContent = icao; bar.classList.remove('hidden'); }
+  showPage('map');
+  toast('Toque na pista certa de ' + icao + ' (ou use Minha posição)');
+}
+function cancelAptFix() { fixingApt = null; const bar = $('#aptFixBar'); if (bar) bar.classList.add('hidden'); }
+function setAptFix(icao, lat, lon) {
+  state.aptFix[icao] = { lat: +(+lat).toFixed(6), lon: +(+lon).toFixed(6) };
+  LS.set('aptFix', state.aptFix);
+  cancelAptFix();
+  renderAirportMarkers();
+  toast('Posição de ' + icao + ' corrigida ✔');
+}
+function removeAptFix(icao) {
+  delete state.aptFix[icao]; LS.set('aptFix', state.aptFix);
+  renderAirportMarkers();
+  toast('Correção de ' + icao + ' removida (voltou ao dado original)');
 }
 
 /* ---------- Navegação direta (Direct-To) ---------- */
@@ -383,6 +415,7 @@ function switchLayer() {
 
 function onMapClick(e) {
   const { lat, lng } = e.latlng;
+  if (fixingApt) { setAptFix(fixingApt, lat, lng); return; }   // corrigindo posição de aeródromo
   if (state.drawMode) {
     state.drawPts.push([lat, lng]);
     drawLine.setLatLngs(state.drawPts);
@@ -1348,8 +1381,8 @@ function buildAirportIndex(brData) {
     }
   });
 }
-// posição do aeródromo p/ plotar/navegar: meio da pista real (bate com satélite) se houver; senão o ponto do aeródromo
-function aptCoord(a) {
+// posição BRUTA do aeródromo: meio da pista real (bate com satélite) se houver; senão o ponto do aeródromo
+function rawAptCenter(a) {
   const rws = RUNWAYS && RUNWAYS.get && RUNWAYS.get(a.icao);
   if (rws && rws.length) {
     const r = rws[0];
@@ -1357,6 +1390,18 @@ function aptCoord(a) {
     if (isFinite(lat) && isFinite(lon)) return { lat, lon };
   }
   return { lat: a.lat, lon: a.lon };
+}
+function aptFixGet(icao) { return state.aptFix && state.aptFix[icao]; }
+// posição p/ plotar/navegar: correção manual do usuário (se houver), senão a bruta
+function aptCoord(a) {
+  const f = aptFixGet(a.icao);
+  return f ? { lat: f.lat, lon: f.lon } : rawAptCenter(a);
+}
+// deslocamento p/ mover a geometria da pista junto com a correção manual
+function aptOffset(a) {
+  const f = aptFixGet(a.icao); if (!f) return { dlat: 0, dlon: 0 };
+  const raw = rawAptCenter(a);
+  return { dlat: f.lat - raw.lat, dlon: f.lon - raw.lon };
 }
 
 function loadAirportsOnline() {
@@ -1657,6 +1702,13 @@ function wire() {
     $('#wpLon').value = state.pos.lon.toFixed(5);
     if (!$('#wpName').value.trim()) $('#wpName').value = 'Pista ' + (state.route.length + 1);
     toast('Coordenadas preenchidas com o GPS');
+  });
+  // barra de correção de posição de aeródromo
+  $('#aptFixCancel').addEventListener('click', cancelAptFix);
+  $('#aptFixGps').addEventListener('click', () => {
+    if (!fixingApt) return;
+    if (!state.pos) { toast('Sem GPS ainda — aguarde o sinal', true); return; }
+    setAptFix(fixingApt, state.pos.lat, state.pos.lon);
   });
   // salvar como pista fixa (a partir do formulário)
   $('#btnSavePlace').addEventListener('click', savePlaceFromForm);
