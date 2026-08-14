@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v51';
+const APP_VERSION = 'v52';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -1030,6 +1030,30 @@ function clearRoute() {
   LS.set('route', state.route);
   drawRouteOnMap(); renderRoute();
 }
+/* ---- Editar um waypoint da rota (renomear / ajustar coordenadas; ex.: pista não homologada) ---- */
+let editingWpIdx = -1;
+function editWaypoint(i) {
+  const w = state.route[i]; if (!w) return;
+  editingWpIdx = i;
+  $('#wpEditName').value = w.name || '';
+  $('#wpEditLat').value = w.lat;
+  $('#wpEditLon').value = w.lon;
+  $('#wpEditModal').classList.remove('hidden');
+  setTimeout(() => $('#wpEditName').focus(), 50);
+}
+function closeWpEdit() { editingWpIdx = -1; $('#wpEditModal').classList.add('hidden'); }
+function saveWpEdit() {
+  if (editingWpIdx < 0) return closeWpEdit();
+  const name = $('#wpEditName').value.trim();
+  const lat = +$('#wpEditLat').value, lon = +$('#wpEditLon').value;
+  if (!name) { toast('Dê um nome ao ponto', true); return; }
+  if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { toast('Coordenadas inválidas', true); return; }
+  state.route[editingWpIdx] = { ...state.route[editingWpIdx], name, lat, lon };
+  LS.set('route', state.route);
+  closeWpEdit();
+  drawRouteOnMap(); renderRoute();
+  toast('Ponto atualizado');
+}
 function reverseRoute() {
   state.route.reverse();
   LS.set('route', state.route);
@@ -1072,7 +1096,8 @@ function renderRoute() {
     tr.innerHTML = `<td>${i+1}</td><td>${w.name}</td><td>${brgM}${i>0?'°':''}</td>`
       + `<td>${i>0?cDist(dist).toFixed(1):'—'}</td><td>${i>0?fmtHM(t):'—'}</td>`
       + `<td>${i>0?cFuel(fuel).toFixed(0):'—'}</td>`
-      + `<td><button class="row-btn" data-rm="${i}"><i class="fas fa-xmark"></i></button></td>`;
+      + `<td class="rt-acts"><button class="row-btn" data-edit="${i}" title="Editar"><i class="fas fa-pen"></i></button>`
+      + `<button class="row-btn" data-rm="${i}" title="Remover"><i class="fas fa-xmark"></i></button></td>`;
     tb.appendChild(tr);
   });
   $('#rt-total-dist').textContent = cDist(totDist).toFixed(1);
@@ -1081,6 +1106,8 @@ function renderRoute() {
 
   tb.querySelectorAll('[data-rm]').forEach(b =>
     b.addEventListener('click', () => removeWaypoint(+b.dataset.rm)));
+  tb.querySelectorAll('[data-edit]').forEach(b =>
+    b.addEventListener('click', () => editWaypoint(+b.dataset.edit)));
 
   renderSavedRoutes();
 }
@@ -1517,6 +1544,24 @@ function wire() {
     if (isNaN(lat) || isNaN(lon)) { toast('Coordenadas inválidas', true); return; }
     addWaypoint({ name, lat, lon });
     $('#wpName').value = $('#wpLat').value = $('#wpLon').value = '';
+  });
+  // preencher o formulário de adicionar com a posição atual (GPS)
+  $('#btnWpGps').addEventListener('click', () => {
+    if (!state.pos) { toast('Sem GPS ainda — aguarde o sinal', true); return; }
+    $('#wpLat').value = state.pos.lat.toFixed(5);
+    $('#wpLon').value = state.pos.lon.toFixed(5);
+    if (!$('#wpName').value.trim()) $('#wpName').value = 'Pista ' + (state.route.length + 1);
+    toast('Coordenadas preenchidas com o GPS');
+  });
+  // modal de edição de ponto
+  $('#wpEditSave').addEventListener('click', saveWpEdit);
+  $('#wpEditCancel').addEventListener('click', closeWpEdit);
+  $('#wpEditModal').addEventListener('click', e => { if (e.target.id === 'wpEditModal') closeWpEdit(); });
+  $('#wpEditGps').addEventListener('click', () => {
+    if (!state.pos) { toast('Sem GPS ainda — aguarde o sinal', true); return; }
+    $('#wpEditLat').value = state.pos.lat.toFixed(5);
+    $('#wpEditLon').value = state.pos.lon.toFixed(5);
+    toast('Coordenadas atualizadas com o GPS');
   });
   $('#btnClearRoute').addEventListener('click', clearRoute);
   $('#btnReverseRoute').addEventListener('click', reverseRoute);

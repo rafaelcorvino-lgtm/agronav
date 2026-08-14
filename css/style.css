@@ -239,6 +239,8 @@ body.nav-on.is-landscape .nav-banner { display:block; }
 .row-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:14px; padding:4px 6px; border-radius:6px; }
 .row-btn:hover { color:var(--accent-red); background:rgba(239,68,68,.1); }
 .row-btn.go:hover { color:var(--accent-green); background:rgba(34,197,94,.1); }
+.rt-acts { display:flex; gap:2px; justify-content:flex-end; }
+.rt-acts .row-btn[data-edit]:hover { color:var(--accent-blue); background:rgba(59,130,246,.12); }
 .icao-tag { font-weight:700; color:var(--accent-cyan); }
 
 .route-params { margin-bottom:16px; }

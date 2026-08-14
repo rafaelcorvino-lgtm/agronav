@@ -158,9 +158,12 @@
                         <div class="field"><label>Nome / ICAO</label><input type="text" id="wpName" placeholder="Ex: SBSP ou Talhão 4" list="icaoList" autocomplete="off"><datalist id="icaoList"></datalist><span class="lookup-hint" id="wpLookupHint"></span></div>
                         <div class="field"><label>Latitude (decimal)</label><input type="number" step="any" id="wpLat" placeholder="-23.6266"></div>
                         <div class="field"><label>Longitude (decimal)</label><input type="number" step="any" id="wpLon" placeholder="-46.6556"></div>
-                        <div class="field end"><button class="btn btn-primary" id="btnAddRoutePt"><i class="fas fa-plus"></i> Adicionar à rota</button></div>
+                        <div class="field end wrap">
+                            <button class="btn btn-ghost" id="btnWpGps" title="Preencher com minha posição atual (GPS)"><i class="fas fa-location-crosshairs"></i> Minha posição</button>
+                            <button class="btn btn-primary" id="btnAddRoutePt"><i class="fas fa-plus"></i> Adicionar à rota</button>
+                        </div>
                     </div>
-                    <p class="hint">Dica: você também pode tocar no mapa (botão <i class="fas fa-map-pin"></i>) ou adicionar a partir de um aeródromo.</p>
+                    <p class="hint">Para uma <b>pista não homologada</b>: dê um nome, toque em <b>Minha posição</b> (ou digite as coordenadas) e adicione. Depois dá pra <b>editar</b> (✏️) na lista abaixo. Também dá pra tocar no mapa (<i class="fas fa-map-pin"></i>) ou usar um aeródromo.</p>
                 </div>
 
                 <div class="card">
@@ -408,6 +411,21 @@
             <div class="modal-actions">
                 <button class="btn btn-ghost" id="fieldCancel">Cancelar</button>
                 <button class="btn btn-primary" id="fieldSave">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Editar waypoint / ponto (ex.: pista não homologada) -->
+    <div class="modal-overlay hidden" id="wpEditModal">
+        <div class="modal">
+            <h3><i class="fas fa-pen"></i> Editar ponto</h3>
+            <div class="field"><label>Nome</label><input type="text" id="wpEditName" placeholder="Ex: Pista Fazenda X"></div>
+            <div class="field"><label>Latitude (decimal)</label><input type="number" step="any" id="wpEditLat" placeholder="-16.34926"></div>
+            <div class="field"><label>Longitude (decimal)</label><input type="number" step="any" id="wpEditLon" placeholder="-47.54765"></div>
+            <button class="btn btn-ghost btn-sm" id="wpEditGps"><i class="fas fa-location-crosshairs"></i> Usar minha posição (GPS)</button>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="wpEditCancel">Cancelar</button>
+                <button class="btn btn-primary" id="wpEditSave">Salvar</button>
             </div>
         </div>
     </div>
