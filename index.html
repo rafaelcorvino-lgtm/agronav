@@ -160,6 +160,7 @@
                         <div class="field"><label>Longitude (decimal)</label><input type="number" step="any" id="wpLon" placeholder="-46.6556"></div>
                         <div class="field end wrap">
                             <button class="btn btn-ghost" id="btnWpGps" title="Preencher com minha posição atual (GPS)"><i class="fas fa-location-crosshairs"></i> Minha posição</button>
+                            <button class="btn btn-ghost" id="btnSavePlace" title="Salvar como pista fixa (permanente, não some ao limpar a rota)"><i class="fas fa-star"></i> Salvar pista</button>
                             <button class="btn btn-primary" id="btnAddRoutePt"><i class="fas fa-plus"></i> Adicionar à rota</button>
                         </div>
                     </div>
@@ -192,6 +193,11 @@
                     </div>
                 </div>
 
+                <div class="card">
+                    <div class="card-head"><h3><i class="fas fa-plane-arrival"></i> Minhas pistas / pontos salvos</h3></div>
+                    <p class="hint">Ficam <b>fixos no mapa</b> (🛬) e <b>não somem</b> ao limpar a rota. Toque num para navegar, adicionar à rota, editar ou excluir.</p>
+                    <div id="placesList" class="saved-list"></div>
+                </div>
                 <div class="card">
                     <div class="card-head"><h3>Planos salvos</h3></div>
                     <div id="savedRoutesList" class="saved-list"></div>
@@ -422,7 +428,10 @@
             <div class="field"><label>Nome</label><input type="text" id="wpEditName" placeholder="Ex: Pista Fazenda X"></div>
             <div class="field"><label>Latitude (decimal)</label><input type="number" step="any" id="wpEditLat" placeholder="-16.34926"></div>
             <div class="field"><label>Longitude (decimal)</label><input type="number" step="any" id="wpEditLon" placeholder="-47.54765"></div>
-            <button class="btn btn-ghost btn-sm" id="wpEditGps"><i class="fas fa-location-crosshairs"></i> Usar minha posição (GPS)</button>
+            <div class="modal-btn-row">
+                <button class="btn btn-ghost btn-sm" id="wpEditGps"><i class="fas fa-location-crosshairs"></i> Usar minha posição (GPS)</button>
+                <button class="btn btn-ghost btn-sm" id="wpEditSavePlace" title="Salvar como pista fixa"><i class="fas fa-star"></i> Salvar como pista</button>
+            </div>
             <div class="modal-actions">
                 <button class="btn btn-ghost" id="wpEditCancel">Cancelar</button>
                 <button class="btn btn-primary" id="wpEditSave">Salvar</button>

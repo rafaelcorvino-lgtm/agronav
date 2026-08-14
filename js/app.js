@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v52';
+const APP_VERSION = 'v53';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -20,6 +20,7 @@ const state = {
   route: LS.get('route', []),          // [{name, lat, lon}]
   savedRoutes: LS.get('savedRoutes', []),
   fields: LS.get('fields', []),        // [{id, name, coords:[[lat,lon]...], area}]
+  places: LS.get('places', []),        // [{id, name, lat, lon}] pistas/pontos fixos (independentes da rota)
   followMode: 1,   // 0=livre, 1=norte acima (seguir), 2=proa acima (track-up)
   curBearing: 0,
   tracking: false,
@@ -104,7 +105,7 @@ function showPage(name) {
   $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
   closeSidebar();
   if (name === 'map' && map) setTimeout(() => map.invalidateSize(), 60);
-  if (name === 'route') renderRoute();
+  if (name === 'route') { renderRoute(); renderPlaces(); }
   if (name === 'fields') renderFields();
   if (name === 'aero') renderAero();
   if (name === 'pedidos') renderPedidos();
@@ -124,6 +125,7 @@ let map, posMarker, posAccCircle, trackLine, routeLine, drawLine, gotoLine, airp
 let airspaceLayer = null, aspRenderer = null;
 const wpMarkers = [];
 const fieldLayers = [];
+const placeMarkers = [];
 const AIRPORT_MIN_ZOOM = 8;   // abaixo disso são muitos aeródromos — não plota
 const AIRPORT_MAX_MARKERS = 600;
 
@@ -155,6 +157,7 @@ function initMap() {
   updateOrient();
   drawRouteOnMap();
   drawFieldsOnMap();
+  drawPlacesOnMap();
 }
 
 /* ---------- Aeródromos no mapa ---------- */
@@ -1030,29 +1033,108 @@ function clearRoute() {
   LS.set('route', state.route);
   drawRouteOnMap(); renderRoute();
 }
-/* ---- Editar um waypoint da rota (renomear / ajustar coordenadas; ex.: pista não homologada) ---- */
-let editingWpIdx = -1;
-function editWaypoint(i) {
-  const w = state.route[i]; if (!w) return;
-  editingWpIdx = i;
+/* ---- Editar um ponto (rota OU pista fixa): renomear / ajustar coordenadas ---- */
+let editTarget = null;                 // {type:'route'|'place', idx}
+function openWpEdit(target, w) {
+  editTarget = target;
   $('#wpEditName').value = w.name || '';
   $('#wpEditLat').value = w.lat;
   $('#wpEditLon').value = w.lon;
   $('#wpEditModal').classList.remove('hidden');
   setTimeout(() => $('#wpEditName').focus(), 50);
 }
-function closeWpEdit() { editingWpIdx = -1; $('#wpEditModal').classList.add('hidden'); }
-function saveWpEdit() {
-  if (editingWpIdx < 0) return closeWpEdit();
+function editWaypoint(i) { const w = state.route[i]; if (w) openWpEdit({ type:'route', idx:i }, w); }
+function editPlace(i) { const p = state.places[i]; if (p) openWpEdit({ type:'place', idx:i }, p); }
+function closeWpEdit() { editTarget = null; $('#wpEditModal').classList.add('hidden'); }
+function readWpEditFields() {
   const name = $('#wpEditName').value.trim();
   const lat = +$('#wpEditLat').value, lon = +$('#wpEditLon').value;
-  if (!name) { toast('Dê um nome ao ponto', true); return; }
-  if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { toast('Coordenadas inválidas', true); return; }
-  state.route[editingWpIdx] = { ...state.route[editingWpIdx], name, lat, lon };
-  LS.set('route', state.route);
-  closeWpEdit();
-  drawRouteOnMap(); renderRoute();
+  if (!name) { toast('Dê um nome ao ponto', true); return null; }
+  if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { toast('Coordenadas inválidas', true); return null; }
+  return { name, lat, lon };
+}
+function saveWpEdit() {
+  if (!editTarget) return closeWpEdit();
+  const f = readWpEditFields(); if (!f) return;
+  if (editTarget.type === 'route') {
+    state.route[editTarget.idx] = { ...state.route[editTarget.idx], ...f };
+    LS.set('route', state.route); closeWpEdit(); drawRouteOnMap(); renderRoute();
+  } else {
+    state.places[editTarget.idx] = { ...state.places[editTarget.idx], ...f };
+    LS.set('places', state.places); closeWpEdit(); drawPlacesOnMap(); renderPlaces();
+  }
   toast('Ponto atualizado');
+}
+function saveEditAsPlace() { const f = readWpEditFields(); if (!f) return; savePlace(f.name, f.lat, f.lon); closeWpEdit(); }
+
+/* ---- Pistas / pontos fixos (permanentes no mapa, independentes da rota) ---- */
+function savePlace(name, lat, lon) {
+  state.places.push({ id: Date.now(), name, lat, lon });
+  LS.set('places', state.places);
+  drawPlacesOnMap(); renderPlaces();
+  toast('Pista salva: ' + name);
+}
+function deletePlace(i) {
+  const p = state.places[i]; if (!p) return;
+  if (!confirm('Excluir a pista "' + p.name + '"?')) return;
+  state.places.splice(i, 1);
+  LS.set('places', state.places);
+  drawPlacesOnMap(); renderPlaces();
+}
+function drawPlacesOnMap() {
+  placeMarkers.forEach(m => map.removeLayer(m));
+  placeMarkers.length = 0;
+  state.places.forEach((p, i) => {
+    const m = L.marker([p.lat, p.lon], { icon: L.divIcon({ className:'', html:'<div class="place-pin">🛬</div>', iconSize:[26,26], iconAnchor:[13,24] }) }).addTo(map);
+    m.bindPopup(() => placePopup(p, i), { minWidth: 210 });
+    m.bindTooltip(p.name, { direction:'top', offset:[0,-20] });
+    placeMarkers.push(m);
+  });
+}
+function placePopup(p, i) {
+  const div = document.createElement('div');
+  div.className = 'apt-popup';
+  div.innerHTML = `<div class="apt-info"><b>🛬 ${p.name}</b><br><span class="apt-meta">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span></div>
+    <div class="apt-actions">
+      <button class="btn btn-primary pl-goto"><i class="fas fa-diamond-turn-right"></i> Navegar até</button>
+      <button class="btn btn-ghost pl-add"><i class="fas fa-plus"></i> Rota</button>
+      <button class="btn btn-ghost pl-edit" title="Editar"><i class="fas fa-pen"></i></button>
+      <button class="btn btn-ghost danger pl-del" title="Excluir"><i class="fas fa-trash"></i></button>
+    </div>`;
+  div.querySelector('.pl-goto').addEventListener('click', () => { directTo(p); map.closePopup(); });
+  div.querySelector('.pl-add').addEventListener('click', () => { addWaypoint({ name:p.name, lat:p.lat, lon:p.lon }); toast(p.name + ' adicionado à rota'); map.closePopup(); });
+  div.querySelector('.pl-edit').addEventListener('click', () => { map.closePopup(); editPlace(i); });
+  div.querySelector('.pl-del').addEventListener('click', () => { map.closePopup(); deletePlace(i); });
+  return div;
+}
+function renderPlaces() {
+  const box = $('#placesList'); if (!box) return;
+  if (!state.places.length) { box.innerHTML = '<p class="empty">Nenhuma pista salva. Preencha um ponto acima e toque em <b>⭐ Salvar pista</b>.</p>'; return; }
+  box.innerHTML = '';
+  state.places.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'saved-item';
+    div.innerHTML = `<div class="si-info"><span class="si-name">🛬 ${p.name}</span>`
+      + `<span class="si-meta">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span></div>`
+      + `<div class="si-actions">`
+      + `<button class="row-btn go" data-plgo="${i}" title="Ver no mapa"><i class="fas fa-location-dot"></i></button>`
+      + `<button class="row-btn" data-pladd="${i}" title="Adicionar à rota"><i class="fas fa-plus"></i></button>`
+      + `<button class="row-btn" data-pledit="${i}" title="Editar"><i class="fas fa-pen"></i></button>`
+      + `<button class="row-btn" data-pldel="${i}" title="Excluir"><i class="fas fa-trash"></i></button></div>`;
+    box.appendChild(div);
+  });
+  box.querySelectorAll('[data-plgo]').forEach(b => b.addEventListener('click', () => { const p = state.places[+b.dataset.plgo]; showPage('map'); setTimeout(() => map.setView([p.lat, p.lon], 13), 120); }));
+  box.querySelectorAll('[data-pladd]').forEach(b => b.addEventListener('click', () => { const p = state.places[+b.dataset.pladd]; addWaypoint({ name:p.name, lat:p.lat, lon:p.lon }); toast(p.name + ' adicionado à rota'); }));
+  box.querySelectorAll('[data-pledit]').forEach(b => b.addEventListener('click', () => editPlace(+b.dataset.pledit)));
+  box.querySelectorAll('[data-pldel]').forEach(b => b.addEventListener('click', () => deletePlace(+b.dataset.pldel)));
+}
+function savePlaceFromForm() {
+  const name = $('#wpName').value.trim();
+  const lat = +$('#wpLat').value, lon = +$('#wpLon').value;
+  if (!name) { toast('Dê um nome à pista', true); return; }
+  if (isNaN(lat) || isNaN(lon)) { toast('Coordenadas inválidas', true); return; }
+  savePlace(name, lat, lon);
+  $('#wpName').value = $('#wpLat').value = $('#wpLon').value = '';
 }
 function reverseRoute() {
   state.route.reverse();
@@ -1553,9 +1635,12 @@ function wire() {
     if (!$('#wpName').value.trim()) $('#wpName').value = 'Pista ' + (state.route.length + 1);
     toast('Coordenadas preenchidas com o GPS');
   });
+  // salvar como pista fixa (a partir do formulário)
+  $('#btnSavePlace').addEventListener('click', savePlaceFromForm);
   // modal de edição de ponto
   $('#wpEditSave').addEventListener('click', saveWpEdit);
   $('#wpEditCancel').addEventListener('click', closeWpEdit);
+  $('#wpEditSavePlace').addEventListener('click', saveEditAsPlace);
   $('#wpEditModal').addEventListener('click', e => { if (e.target.id === 'wpEditModal') closeWpEdit(); });
   $('#wpEditGps').addEventListener('click', () => {
     if (!state.pos) { toast('Sem GPS ainda — aguarde o sinal', true); return; }
