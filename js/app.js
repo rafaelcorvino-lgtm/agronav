@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 
-const APP_VERSION = 'v55';
+const APP_VERSION = 'v56';
 
 /* ---------- Storage helpers ---------- */
 const LS = {
@@ -413,6 +413,15 @@ function switchLayer() {
   toast('Camada: ' + baseLayers[state.layerIdx].name);
 }
 
+// adiciona waypoint no ponto clicado quando o modo está ligado (serve p/ clique no mapa E em cima de talhão/pista)
+function maybeAddWpAt(e) {
+  if (!state.addWpMode) return false;
+  const { lat, lng } = e.latlng;
+  addWaypoint({ name:'WP' + (state.route.length + 1), lat:+lat.toFixed(5), lon:+lng.toFixed(5) });
+  toast('Waypoint adicionado');
+  if (e.originalEvent) L.DomEvent.stop(e);   // impede que o talhão abra a legenda por baixo
+  return true;
+}
 function onMapClick(e) {
   const { lat, lng } = e.latlng;
   if (fixingApt) { setAptFix(fixingApt, lat, lng); return; }   // corrigindo posição de aeródromo
@@ -422,10 +431,7 @@ function onMapClick(e) {
     updateDrawPreview();
     return;
   }
-  if (state.addWpMode) {
-    addWaypoint({ name:'WP' + (state.route.length + 1), lat:+lat.toFixed(5), lon:+lng.toFixed(5) });
-    toast('Waypoint adicionado');
-  }
+  maybeAddWpAt(e);
 }
 
 /* ---------- GPS ---------- */
@@ -1323,6 +1329,7 @@ function drawFieldsOnMap() {
   state.fields.forEach(f => {
     const poly = L.polygon(f.coords, { color:'#22c55e', weight:2, fillOpacity:.12 })
       .bindTooltip(`${f.name} · ${fmtArea(f.area)}`, { permanent:false });
+    poly.on('click', maybeAddWpAt);   // em modo waypoint, clicar no talhão adiciona o ponto (não só a legenda)
     poly.addTo(map);
     fieldLayers.push(poly);
   });
@@ -1499,16 +1506,19 @@ function wireIcaoLookup() {
 function buildIcaoSuggestions(code) {
   const dl = $('#icaoList');
   dl.innerHTML = '';
-  if (!/^[A-Z0-9]{2,4}$/.test(code)) return;
+  const q = (code || '').trim().toUpperCase();
+  if (q.length < 2) return;
   let n = 0;
   const frag = document.createDocumentFragment();
   for (const a of AIRPORT_MAP.values()) {
-    if (a.icao.startsWith(code)) {
+    // busca por ICAO, cidade OU nome (assim dá pra achar pelo nome da cidade)
+    const hit = a.icao.startsWith(q) || (a.city || '').toUpperCase().includes(q) || (a.name || '').toUpperCase().includes(q);
+    if (hit) {
       const o = document.createElement('option');
       o.value = a.icao;
-      o.label = `${a.name}${a.city ? ' — ' + a.city + '/' + a.uf : ''}`;
+      o.label = `${a.icao} — ${a.name}${a.city ? ' (' + a.city + (a.uf ? '/' + a.uf : '') + ')' : ''}`;
       frag.appendChild(o);
-      if (++n >= 12) break;
+      if (++n >= 20) break;
     }
   }
   dl.appendChild(frag);
