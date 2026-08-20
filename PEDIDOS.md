@@ -18,3 +18,4 @@ Quando quiser que eu execute, é só me dizer: **"processa os pedidos"**.
 - [x] Subir os campos do HUD para o topo da tela — v44
 - [x] Corrigir o arrasto dos campos (segurar p/ arrastar, funciona sobre o mapa) — v46
 - [x] (issue #1) Corrigir clique em área restrita mostrando informação do espaço aéreo maior em vez da área restrita — v49
+- [x] (issue #2) Criar um jeito de ver o log do app (changelog) dentro do próprio app, sem precisar abrir o Github — v56
